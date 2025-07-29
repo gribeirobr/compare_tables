@@ -23,6 +23,25 @@ def gerar_download(df, filename):
 def dados_preenchidos():
     return all([spreadsheet_id, gid_original, gid_atualizado])
 
+
+USUARIO_CORRETO = "admin"
+SENHA_CORRETA = "1234"
+
+if "autenticado" not in st.session_state:
+    st.session_state.autenticado = False
+
+if not st.session_state.autenticado:
+    st.subheader("Login")
+    usuario = st.text_input("Usuário")
+    senha = st.text_input("Senha", type="password")
+    if st.button("Entrar"):
+        if usuario == USUARIO_CORRETO and senha == SENHA_CORRETA:
+            st.session_state.autenticado = True
+            st.success("Login realizado com sucesso!")
+        else:
+            st.error("Usuário ou senha incorretos.")
+    st.stop()
+
 st.title("Comparador de Tabelas do Google Sheets")
 
 spreadsheet_id = st.text_input("ID da Planilha", "")
