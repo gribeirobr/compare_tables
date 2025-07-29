@@ -38,9 +38,10 @@ if not st.session_state.autenticado:
         if usuario == USUARIO_CORRETO and senha == SENHA_CORRETA:
             st.session_state.autenticado = True
             st.success("Login realizado com sucesso!")
+            st.experimental_rerun()
         else:
             st.error("Usuário ou senha incorretos.")
-    st.stop()
+        st.stop()
 
 st.title("Comparador de Tabelas do Google Sheets")
 
