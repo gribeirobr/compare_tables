@@ -90,13 +90,29 @@ if dados_preenchidos():
                         for col in df.select_dtypes(include='object').columns:
                             df[col] = df[col].apply(limpar_texto)
 
-                    st.subheader("Linhas somente na tabela A")
+                    st.subheader("Registros somente na tabela A")
                     st.dataframe(df1_unq)
-                    st.markdown(gerar_download(df1_unq, "linhas_somente_tabela_a.xlsx"), unsafe_allow_html=True)
+                    st.markdown(gerar_download(df1_unq, "registros_somente_tabela_a.xlsx"), unsafe_allow_html=True)
 
-                    st.subheader("Linhas somente na tabela B")
+                    st.subheader("Registros somente na tabela B")
                     st.dataframe(df2_unq)
-                    st.markdown(gerar_download(df2_unq, "linhas_somente_tabela_b.xlsx"), unsafe_allow_html=True)
+                    st.markdown(gerar_download(df2_unq, "registros_somente_tabela_b.xlsx"), unsafe_allow_html=True)
+
+                    df_intersecao = comparacao.intersect_rows
+
+                    for col in df_intersecao.select_dtypes(include='object').columns:
+                        df_intersecao[col] = df_intersecao[col].apply(limpar_texto)
+
+                    st.subheader("Registros iguais nas duas tabelas")
+                    st.dataframe(df_intersecao)
+                    st.markdown(gerar_download(df_intersecao, "registros_conciliados.xlsx"), unsafe_allow_html=True)
+
+                    total_iguais = comparacao.matches
+                    total_diferentes = df1_unq.shape[0] + df2_unq.shape[0]
+
+                    st.markdown("### Resumo da Comparação")
+                    st.markdown(f"- **Linhas iguais:** {total_iguais}")
+                    st.markdown(f"- **Linhas diferentes:** {total_diferentes}")
 
                 except Exception as e:
                     st.error(f"Erro ao comparar: {e}")
