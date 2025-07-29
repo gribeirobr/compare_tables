@@ -1,0 +1,5 @@
+streamlit
+pandas
+datacompy
+pyspark
+openpyxl
