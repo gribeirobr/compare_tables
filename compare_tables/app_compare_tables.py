@@ -35,7 +35,6 @@ def comparar_abas(spreadsheet_id, gid_original, gid_atualizado):
         df2_name='Atualizado',
         abs_tol=0,
         rel_tol=0,
-        ignore_extra_columns=False
     )
 
     df1_unq = comparacao.df1_unq_rows
