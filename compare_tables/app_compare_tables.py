@@ -107,7 +107,7 @@ if dados_preenchidos():
                     st.dataframe(df_intersecao)
                     st.markdown(gerar_download(df_intersecao, "registros_conciliados.xlsx"), unsafe_allow_html=True)
 
-                    total_iguais = comparacao.matches()
+                    total_iguais = df_intersecao.shape[0]
                     total_diferentes = df1_unq.shape[0] + df2_unq.shape[0]
 
                     st.markdown("### Resumo da Comparação")
