@@ -26,8 +26,8 @@ def dados_preenchidos():
 st.title("🔍 Comparador de Abas do Google Sheets (com seleção de colunas)")
 
 spreadsheet_id = st.text_input("ID da Planilha", "")
-gid_original = st.text_input("GID da Aba Original", "")
-gid_atualizado = st.text_input("GID da Aba Atualizada", "")
+gid_original = st.text_input("GID da Aba da Tabela A", "")
+gid_atualizado = st.text_input("GID da Aba da Tabela B", "")
 
 if "manual_mode" not in st.session_state:
     st.session_state.manual_mode = False
@@ -90,13 +90,13 @@ if dados_preenchidos():
                         for col in df.select_dtypes(include='object').columns:
                             df[col] = df[col].apply(limpar_texto)
 
-                    st.subheader("Linhas somente na aba original")
+                    st.subheader("Linhas somente na tabela A")
                     st.dataframe(df1_unq)
-                    st.markdown(gerar_download(df1_unq, "somente_original.xlsx"), unsafe_allow_html=True)
+                    st.markdown(gerar_download(df1_unq, "linhas_somente_tabela_a.xlsx"), unsafe_allow_html=True)
 
-                    st.subheader("Linhas somente na aba atualizada")
+                    st.subheader("Linhas somente na tabela B")
                     st.dataframe(df2_unq)
-                    st.markdown(gerar_download(df2_unq, "somente_atualizado.xlsx"), unsafe_allow_html=True)
+                    st.markdown(gerar_download(df2_unq, "linhas_somente_tabela_b.xlsx"), unsafe_allow_html=True)
 
                 except Exception as e:
                     st.error(f"Erro ao comparar: {e}")
