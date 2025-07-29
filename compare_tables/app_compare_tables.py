@@ -27,7 +27,7 @@ def dados_preenchidos():
 USUARIOS_CADASTRADOS = {
     "admin": "1234",
     "guilherme": "senha_guilherme",
-    "maria": "senha_maria",
+    "GABI_REZENDE": "gabiR#123",
     "ana": "abc123"
 }
 
