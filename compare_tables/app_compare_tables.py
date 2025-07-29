@@ -5,7 +5,6 @@ import re
 import io
 from base64 import b64encode
 
-# Função para limpar texto
 def limpar_texto(texto):
     if isinstance(texto, str):
         texto = texto.replace('\u00A0', ' ')
@@ -13,40 +12,6 @@ def limpar_texto(texto):
         return texto.strip()
     return texto
 
-# Função principal de comparação
-def comparar_abas(spreadsheet_id, gid_original, gid_atualizado):
-    url_original = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid_original}"
-    url_atualizado = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid_atualizado}"
-
-    df_original = pd.read_csv(url_original, encoding='utf-8-sig')
-    df_atualizado = pd.read_csv(url_atualizado, encoding='utf-8-sig')
-
-    # Colunas comuns
-    colunas_comuns = list(set(df_original.columns) & set(df_atualizado.columns))
-    if not colunas_comuns:
-        raise ValueError("Não há colunas comuns entre as abas para realizar a junção.")
-
-    # Comparação com pandas
-    comparacao = datacompy.Compare(
-        df1=df_original,
-        df2=df_atualizado,
-        join_columns=colunas_comuns,
-        df1_name='Original',
-        df2_name='Atualizado',
-        abs_tol=0,
-        rel_tol=0,
-    )
-
-    df1_unq = comparacao.df1_unq_rows
-    df2_unq = comparacao.df2_unq_rows
-
-    for df in [df1_unq, df2_unq]:
-        for col in df.select_dtypes(include='object').columns:
-            df[col] = df[col].apply(limpar_texto)
-
-    return df1_unq, df2_unq
-
-# Função para gerar link de download
 def gerar_download(df, filename):
     output = io.BytesIO()
     with pd.ExcelWriter(output) as writer:
@@ -55,30 +20,69 @@ def gerar_download(df, filename):
     href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="{filename}">📥 Baixar {filename}</a>'
     return href
 
-# Streamlit App
-st.title("📊 Comparador de Abas do Google Sheets")
+st.title("🔍 Comparador de Abas do Google Sheets (com seleção de colunas)")
 
-st.markdown("Compare duas abas de uma mesma planilha do Google Sheets via `spreadsheet_id` e `gid`.")
+spreadsheet_id = st.text_input("📄 ID da Planilha", "")
+gid_original = st.text_input("📑 GID da Aba Original", "")
+gid_atualizado = st.text_input("📑 GID da Aba Atualizada", "")
 
-spreadsheet_id = st.text_input("🆔 ID da Planilha", "")
-gid_original = st.text_input("📄 GID da Aba onde está a Tabela A", "")
-gid_atualizado = st.text_input("📄 GID da Aba onde está a Tabela B", "")
+carregado = False
 
-if st.button("🔍 Comparar"):
-    if spreadsheet_id and gid_original and gid_atualizado:
-        with st.spinner("Comparando..."):
-            try:
-                df1, df2 = comparar_abas(spreadsheet_id, gid_original, gid_atualizado)
-                st.success("✅ Comparação concluída!")
+if spreadsheet_id and gid_original and gid_atualizado:
+    try:
+        url_original = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid_original}"
+        url_atualizado = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid_atualizado}"
 
-                st.subheader("🔸 Linhas somente na Tabela A")
-                st.dataframe(df1)
-                st.markdown(gerar_download(df1, "linhas_somente_tabela_a.xlsx"), unsafe_allow_html=True)
+        df_original = pd.read_csv(url_original, encoding='utf-8-sig')
+        df_atualizado = pd.read_csv(url_atualizado, encoding='utf-8-sig')
 
-                st.subheader("🔹 Linhas somente na Tabela B")
-                st.dataframe(df2)
-                st.markdown(gerar_download(df2, "linhas_somente_tabela_b.xlsx"), unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"❌ Erro: {e}")
-    else:
-        st.warning("⚠️ Preencha todos os campos para continuar.")
+        st.success("✅ Abas carregadas com sucesso!")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**Colunas da Tabela A**")
+            colunas_original = st.multiselect("Selecione as colunas de junção da tabela A", df_original.columns)
+
+        with col2:
+            st.markdown("**Colunas da Tabela B**")
+            colunas_atualizado = st.multiselect("Selecione as colunas correspondentes da tabela B", df_atualizado.columns)
+
+        if len(colunas_original) == len(colunas_atualizado) and len(colunas_original) > 0:
+            if st.button("🔎 Comparar"):
+                try:
+                    column_mapping = dict(zip(colunas_original, colunas_atualizado))
+
+                    comparacao = datacompy.Compare(
+                        df1=df_original,
+                        df2=df_atualizado,
+                        join_columns=column_mapping,
+                        df1_name='Original',
+                        df2_name='Atualizado',
+                        abs_tol=0,
+                        rel_tol=0
+                    )
+
+                    df1_unq = comparacao.df1_unq_rows
+                    df2_unq = comparacao.df2_unq_rows
+
+                    for df in [df1_unq, df2_unq]:
+                        for col in df.select_dtypes(include='object').columns:
+                            df[col] = df[col].apply(limpar_texto)
+
+                    st.subheader("🔸 Linhas somente na aba original")
+                    st.dataframe(df1_unq)
+                    st.markdown(gerar_download(df1_unq, "somente_original.xlsx"), unsafe_allow_html=True)
+
+                    st.subheader("🔹 Linhas somente na aba atualizada")
+                    st.dataframe(df2_unq)
+                    st.markdown(gerar_download(df2_unq, "somente_atualizado.xlsx"), unsafe_allow_html=True)
+
+                except Exception as e:
+                    st.error(f"Erro ao comparar: {e}")
+        elif len(colunas_original) != len(colunas_atualizado):
+            st.warning("⚠️ As listas de colunas devem ter o mesmo número de elementos.")
+
+    except Exception as e:
+        st.error(f"Erro ao carregar as abas: {e}")
+
