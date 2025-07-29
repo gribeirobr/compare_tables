@@ -20,6 +20,9 @@ def gerar_download(df, filename):
     href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="{filename}">📥 Baixar {filename}</a>'
     return href
 
+def dados_preenchidos():
+    return all([spreadsheet_id, gid_original, gid_atualizado])
+
 st.title("🔍 Comparador de Abas do Google Sheets (com seleção de colunas)")
 
 spreadsheet_id = st.text_input("🆔 ID da Planilha", "")
@@ -31,15 +34,17 @@ if "manual_mode" not in st.session_state:
 
 if not st.session_state.manual_mode:
     if st.button("🔧 Selecionar colunas manualmente"):
-        st.session_state.manual_mode = True
+        if not dados_preenchidos():
+            st.warning("⚠️ Preencha o ID da planilha e os GIDs antes de selecionar colunas.")
+        else:
+            st.session_state.manual_mode = True
 
-# Modo manual ativado: mostrar seletores
 if st.session_state.manual_mode:
     st.markdown("### 🔗 Selecione as colunas de junção manualmente")
 
 carregado = False
 
-if spreadsheet_id and gid_original and gid_atualizado:
+if dados_preenchidos():
     try:
         url_original = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid_original}"
         url_atualizado = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid_atualizado}"
@@ -59,8 +64,12 @@ if spreadsheet_id and gid_original and gid_atualizado:
             st.markdown("**Colunas da Tabela B**")
             colunas_atualizado = st.multiselect("Selecione as colunas correspondentes da tabela B", df_atualizado.columns)
 
-        if len(colunas_original) == len(colunas_atualizado) and len(colunas_original) > 0:
-            if st.button("🔎 Comparar"):
+        if st.button("🔎 Comparar"):
+            if not dados_preenchidos():
+                st.warning("⚠️ Preencha o ID da planilha e os GIDs antes de comparar.")
+            elif len(colunas_original) != len(colunas_atualizado) or len(colunas_original) == 0:
+                st.warning("⚠️ As listas de colunas devem ter o mesmo número de elementos.")
+            else:
                 try:
                     column_mapping = dict(zip(colunas_original, colunas_atualizado))
 
