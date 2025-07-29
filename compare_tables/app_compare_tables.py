@@ -23,7 +23,7 @@ def gerar_download(df, filename):
 def dados_preenchidos():
     return all([spreadsheet_id, gid_original, gid_atualizado])
 
-st.title("🔍 Comparador de Abas do Google Sheets (com seleção de colunas)")
+st.title("Comparador de Tabelas do Google Sheets")
 
 spreadsheet_id = st.text_input("ID da Planilha", "")
 gid_original = st.text_input("GID da Aba da Tabela A", "")
@@ -40,7 +40,7 @@ if not st.session_state.manual_mode:
             st.session_state.manual_mode = True
 
 if st.session_state.manual_mode:
-    st.markdown("### 🔗 Selecione as colunas de junção manualmente")
+    st.markdown("### Selecione as colunas de junção manualmente")
 
 carregado = False
 
@@ -64,7 +64,7 @@ if dados_preenchidos():
             st.markdown("**Colunas da Tabela B**")
             colunas_atualizado = st.multiselect("Selecione as colunas correspondentes da tabela B", df_atualizado.columns)
 
-        if st.button("🔎 Comparar"):
+        if st.button("Comparar"):
             if not dados_preenchidos():
                 st.warning("Preencha o ID da planilha e os GIDs antes de comparar.")
             elif len(colunas_original) != len(colunas_atualizado) or len(colunas_original) == 0:
