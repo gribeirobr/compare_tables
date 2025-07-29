@@ -22,9 +22,20 @@ def gerar_download(df, filename):
 
 st.title("🔍 Comparador de Abas do Google Sheets (com seleção de colunas)")
 
-spreadsheet_id = st.text_input("📄 ID da Planilha", "")
-gid_original = st.text_input("📑 GID da Aba Original", "")
-gid_atualizado = st.text_input("📑 GID da Aba Atualizada", "")
+spreadsheet_id = st.text_input("🆔 ID da Planilha", "")
+gid_original = st.text_input("📄 GID da Aba Original", "")
+gid_atualizado = st.text_input("📄 GID da Aba Atualizada", "")
+
+if "manual_mode" not in st.session_state:
+    st.session_state.manual_mode = False
+
+if not st.session_state.manual_mode:
+    if st.button("🔧 Selecionar colunas manualmente"):
+        st.session_state.manual_mode = True
+
+# Modo manual ativado: mostrar seletores
+if st.session_state.manual_mode:
+    st.markdown("### 🔗 Selecione as colunas de junção manualmente")
 
 carregado = False
 
