@@ -24,27 +24,44 @@ def dados_preenchidos():
     return all([spreadsheet_id, gid_original, gid_atualizado])
 
 
-USUARIO_CORRETO = "admin"
-SENHA_CORRETA = "1234"
+USUARIOS_CADASTRADOS = {
+    "admin": "1234",
+    "guilherme": "senha_guilherme",
+    "maria": "senha_maria",
+    "ana": "abc123"
+}
 
 if "autenticado" not in st.session_state:
     st.session_state.autenticado = False
+if "usuario_logado" not in st.session_state:
+    st.session_state.usuario_logado = None
 
 if not st.session_state.autenticado:
     st.subheader("Login")
     usuario = st.text_input("Usuário")
     senha = st.text_input("Senha", type="password")
+
     if st.button("Entrar"):
-        if usuario == USUARIO_CORRETO and senha == SENHA_CORRETA:
+        if usuario in USUARIOS_CADASTRADOS and senha == USUARIOS_CADASTRADOS[usuario]:
             st.session_state.autenticado = True
-            st.success("Login realizado com sucesso!")
+            st.session_state.usuario_logado = usuario
+            st.success(f"Bem-vindo, {usuario}!")
             st.rerun()
         else:
             st.error("Usuário ou senha incorretos.")
-        st.stop()
+    st.stop()
 
 if st.session_state.autenticado:
     st.title("Comparador de Tabelas do Google Sheets")
+
+    col1, col2 = st.columns([3,1])
+    with col1:
+        st.markdown(f"👤 Usuário logado: **{st.session_state.usuario_logado}**")
+    with col2:
+        if st.button("Logout"):
+            st.session_state.autenticado = False
+            st.session_state.usuario_logado = None
+            st.rerun()
 
     spreadsheet_id = st.text_input("ID da Planilha", "")
     gid_original = st.text_input("GID da Aba da Tabela A", "")
