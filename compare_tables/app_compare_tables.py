@@ -17,7 +17,7 @@ def gerar_download(df, filename):
     with pd.ExcelWriter(output) as writer:
         df.to_excel(writer, index=False)
     b64 = b64encode(output.getvalue()).decode()
-    href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="{filename}">📥 Baixar {filename}</a>'
+    href = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="{filename}">Baixar {filename}</a>'
     return href
 
 def dados_preenchidos():
@@ -25,17 +25,17 @@ def dados_preenchidos():
 
 st.title("🔍 Comparador de Abas do Google Sheets (com seleção de colunas)")
 
-spreadsheet_id = st.text_input("🆔 ID da Planilha", "")
-gid_original = st.text_input("📄 GID da Aba Original", "")
-gid_atualizado = st.text_input("📄 GID da Aba Atualizada", "")
+spreadsheet_id = st.text_input("ID da Planilha", "")
+gid_original = st.text_input("GID da Aba Original", "")
+gid_atualizado = st.text_input("GID da Aba Atualizada", "")
 
 if "manual_mode" not in st.session_state:
     st.session_state.manual_mode = False
 
 if not st.session_state.manual_mode:
-    if st.button("🔧 Selecionar colunas manualmente"):
+    if st.button("Selecionar colunas manualmente"):
         if not dados_preenchidos():
-            st.warning("⚠️ Preencha o ID da planilha e os GIDs antes de selecionar colunas.")
+            st.warning("Preencha o ID da planilha e os GIDs antes de selecionar colunas.")
         else:
             st.session_state.manual_mode = True
 
@@ -52,7 +52,7 @@ if dados_preenchidos():
         df_original = pd.read_csv(url_original, encoding='utf-8-sig')
         df_atualizado = pd.read_csv(url_atualizado, encoding='utf-8-sig')
 
-        st.success("✅ Abas carregadas com sucesso!")
+        st.success("Abas carregadas com sucesso!")
 
         col1, col2 = st.columns(2)
 
@@ -66,9 +66,9 @@ if dados_preenchidos():
 
         if st.button("🔎 Comparar"):
             if not dados_preenchidos():
-                st.warning("⚠️ Preencha o ID da planilha e os GIDs antes de comparar.")
+                st.warning("Preencha o ID da planilha e os GIDs antes de comparar.")
             elif len(colunas_original) != len(colunas_atualizado) or len(colunas_original) == 0:
-                st.warning("⚠️ As listas de colunas devem ter o mesmo número de elementos.")
+                st.warning("As listas de colunas devem ter o mesmo número de elementos.")
             else:
                 try:
                     column_mapping = dict(zip(colunas_original, colunas_atualizado))
@@ -90,18 +90,18 @@ if dados_preenchidos():
                         for col in df.select_dtypes(include='object').columns:
                             df[col] = df[col].apply(limpar_texto)
 
-                    st.subheader("🔸 Linhas somente na aba original")
+                    st.subheader("Linhas somente na aba original")
                     st.dataframe(df1_unq)
                     st.markdown(gerar_download(df1_unq, "somente_original.xlsx"), unsafe_allow_html=True)
 
-                    st.subheader("🔹 Linhas somente na aba atualizada")
+                    st.subheader("Linhas somente na aba atualizada")
                     st.dataframe(df2_unq)
                     st.markdown(gerar_download(df2_unq, "somente_atualizado.xlsx"), unsafe_allow_html=True)
 
                 except Exception as e:
                     st.error(f"Erro ao comparar: {e}")
         elif len(colunas_original) != len(colunas_atualizado):
-            st.warning("⚠️ As listas de colunas devem ter o mesmo número de elementos.")
+            st.warning("As listas de colunas devem ter o mesmo número de elementos.")
 
     except Exception as e:
         st.error(f"Erro ao carregar as abas: {e}")
