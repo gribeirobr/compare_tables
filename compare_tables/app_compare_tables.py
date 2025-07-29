@@ -3,7 +3,6 @@ import pandas as pd
 import datacompy
 import re
 import io
-from pyspark.sql import SparkSession
 from base64 import b64encode
 
 # Função para limpar texto
@@ -16,37 +15,37 @@ def limpar_texto(texto):
 
 # Função principal de comparação
 def comparar_abas(spreadsheet_id, gid_original, gid_atualizado):
-    # Spark session
-    spark = SparkSession.builder.appName("CompararPlanilhas").getOrCreate()
-
     url_original = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid_original}"
     url_atualizado = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid_atualizado}"
 
     df_original = pd.read_csv(url_original, encoding='utf-8-sig')
     df_atualizado = pd.read_csv(url_atualizado, encoding='utf-8-sig')
 
-    df_A = spark.createDataFrame(df_original)
-    df_B = spark.createDataFrame(df_atualizado)
-
-    join_cols = list(set(df_original.columns) & set(df_atualizado.columns))
-    if not join_cols:
+    # Colunas comuns
+    colunas_comuns = list(set(df_original.columns) & set(df_atualizado.columns))
+    if not colunas_comuns:
         raise ValueError("Não há colunas comuns entre as abas para realizar a junção.")
 
-    comparacao = datacompy.SparkSQLCompare(
-        spark,
-        df_A,
-        df_B,
-        join_columns=join_cols
+    # Comparação com pandas
+    comparacao = datacompy.Compare(
+        df1=df_original,
+        df2=df_atualizado,
+        join_columns=colunas_comuns,
+        df1_name='Original',
+        df2_name='Atualizado',
+        abs_tol=0,
+        rel_tol=0,
+        ignore_extra_columns=False
     )
 
-    df1 = comparacao.df1_unq_rows.toPandas()
-    df2 = comparacao.df2_unq_rows.toPandas()
+    df1_unq = comparacao.df1_unq_rows
+    df2_unq = comparacao.df2_unq_rows
 
-    for df in [df1, df2]:
+    for df in [df1_unq, df2_unq]:
         for col in df.select_dtypes(include='object').columns:
             df[col] = df[col].apply(limpar_texto)
 
-    return df1, df2
+    return df1_unq, df2_unq
 
 # Função para gerar link de download
 def gerar_download(df, filename):
@@ -58,27 +57,29 @@ def gerar_download(df, filename):
     return href
 
 # Streamlit App
-st.title("🧾 Comparador de Abas do Google Sheets")
+st.title("📊 Comparador de Abas do Google Sheets")
 
-spreadsheet_id = st.text_input("ID da Planilha", "")
-gid_original = st.text_input("GID da Aba Original", "")
-gid_atualizado = st.text_input("GID da Aba Atualizada", "")
+st.markdown("Compare duas abas de uma mesma planilha do Google Sheets via `spreadsheet_id` e `gid`.")
 
-if st.button("Comparar"):
+spreadsheet_id = st.text_input("🆔 ID da Planilha", "")
+gid_original = st.text_input("📄 GID da Aba onde está a Tabela A", "")
+gid_atualizado = st.text_input("📄 GID da Aba onde está a Tabela B", "")
+
+if st.button("🔍 Comparar"):
     if spreadsheet_id and gid_original and gid_atualizado:
         with st.spinner("Comparando..."):
             try:
                 df1, df2 = comparar_abas(spreadsheet_id, gid_original, gid_atualizado)
-                st.success("Comparação realizada!")
+                st.success("✅ Comparação concluída!")
 
-                st.subheader("📄 Linhas somente na aba original")
-                st.write(df1)
-                st.markdown(gerar_download(df1, "somente_original.xlsx"), unsafe_allow_html=True)
+                st.subheader("🔸 Linhas somente na Tabela A")
+                st.dataframe(df1)
+                st.markdown(gerar_download(df1, "linhas_somente_tabela_a.xlsx"), unsafe_allow_html=True)
 
-                st.subheader("📄 Linhas somente na aba atualizada")
-                st.write(df2)
-                st.markdown(gerar_download(df2, "somente_atualizado.xlsx"), unsafe_allow_html=True)
+                st.subheader("🔹 Linhas somente na Tabela B")
+                st.dataframe(df2)
+                st.markdown(gerar_download(df2, "linhas_somente_tabela_b.xlsx"), unsafe_allow_html=True)
             except Exception as e:
-                st.error(f"Erro: {e}")
+                st.error(f"❌ Erro: {e}")
     else:
-        st.warning("Preencha todos os campos.")
+        st.warning("⚠️ Preencha todos os campos para continuar.")
