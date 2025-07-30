@@ -527,15 +527,42 @@ def pagina_login():
 
 
 # --- Menu Principal ---
+# --- Menu Principal ---
 def menu_principal():
     st.title(f"Suite de Ferramentas de Planilhas")
-    st.markdown(f"**Usuário:** `{st.session_state.usuario_logado}`")
+    st.markdown(f"**Usuário:** `{st.session_state.get('usuario_logado', 'Convidado')}`")
     
-    # ... (o resto do seu menu fica aqui) ...
+    st.write("### Selecione a ferramenta que deseja utilizar:")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        with st.container(border=True):
+            st.subheader("Comparador")
+            st.write("Compare duas tabelas e identifique diferenças entre elas.")
+            if st.button("Acessar Comparador", key="btn1", use_container_width=True):
+                st.session_state.pagina_atual = "comparador"
+                st.rerun()
+    
+    with col2:
+        with st.container(border=True):
+            st.subheader("Filtro Avançado")
+            st.write("Filtre dados com múltiplos critérios e realize cálculos.")
+            if st.button("Acessar Filtro", key="btn2", use_container_width=True):
+                st.session_state.pagina_atual = "filtro"
+                st.rerun()
+    
+    with col3:
+         with st.container(border=True):
+            st.subheader("Renomeador")
+            st.write("Selecione, renomeie e organize as colunas da sua planilha.")
+            if st.button("Acessar Renomeador", key="btn3", use_container_width=True):
+                st.session_state.pagina_atual = "renomeador"
+                st.rerun()
     
     st.divider()
     if st.button("Sair do Sistema"):
-        # **NOVA FORMA DE APAGAR O COOKIE**
+        # Apaga o cookie
         cookie_manager.set('user_session', '', expires_at=datetime.datetime.now() - datetime.timedelta(days=1))
         
         st.session_state.clear()
