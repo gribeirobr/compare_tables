@@ -911,7 +911,6 @@ def pagina_login():
 
         if submitted:
             if usuario in USUARIOS_CADASTRADOS and senha == USUARIOS_CADASTRADOS[usuario]:
-                # **NOVA FORMA DE DEFINIR O COOKIE**
                 cookie_manager.set(
                     'user_session', 
                     usuario, 
@@ -932,7 +931,7 @@ def menu_principal():
     st.write("### Selecione a ferramenta que deseja utilizar:")
     
     st.write("---")
-    st.subheader("Ferramentas Principais")
+   
     col1, col2, col3 = st.columns(3)
     with col1:
         with st.container(border=True):
@@ -957,7 +956,7 @@ def menu_principal():
                 st.rerun()
     
     st.write("---")
-    st.subheader("Ferramentas Adicionais")
+   
     col4, col5, col6, col7 = st.columns(4)
     with col4:
         with st.container(border=True):
@@ -996,7 +995,7 @@ def menu_principal():
         st.session_state.pagina_atual = "login"
         st.rerun()
 
-# --- Bloco Principal de Navegação (ATUALIZADO) ---
+# --- Bloco Principal de Navegação 
 user_from_cookie = cookie_manager.get('user_session')
 
 if not st.session_state.get("autenticado") and user_from_cookie:
@@ -1020,7 +1019,6 @@ elif pagina == "filtro":
     modulo_filtro()
 elif pagina == "renomeador":
     modulo_renomeador()
-# NOVO: Rotas para as novas páginas
 elif pagina == "unificador":
     modulo_unificador()
 elif pagina == "agrupador":
