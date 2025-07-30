@@ -5,6 +5,7 @@ import io
 USUARIOS_CADASTRADOS = {
     "admin": "1234",
     "guilherme": "senha_guilherme",
+    "ERICA_NAS": "ericaN#123"
 }
 
 if "autenticado" not in st.session_state:

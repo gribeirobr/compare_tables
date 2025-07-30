@@ -5,7 +5,6 @@ import numpy as np
 from io import BytesIO
 
 USUARIOS_CADASTRADOS = {
-    "admin": "1234",
     "guilherme": "senha_guilherme",
     "GABI_REZENDE": "gabiR#123",
     "ana": "abc123"

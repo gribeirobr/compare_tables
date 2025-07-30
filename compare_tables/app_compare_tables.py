@@ -25,10 +25,10 @@ def dados_preenchidos():
 
 
 USUARIOS_CADASTRADOS = {
-    "admin": "1234",
     "guilherme": "senha_guilherme",
     "GABI_REZENDE": "gabiR#123",
-    "ana": "abc123"
+    "AMANDA_MASSON": "amandaM#123",
+    "ERICA_NAS": "ericaN#123"
 }
 
 if "autenticado" not in st.session_state:
