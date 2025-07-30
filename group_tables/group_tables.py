@@ -156,14 +156,15 @@ if st.session_state.autenticado:
                             st.session_state.filtros[i]["coluna"] = coluna
                         
                         with col2:
-                            # Selecionar valor para filtro - CORREÇÃO DO ERRO
                             if coluna and coluna in df.columns:
                                 valores = df[coluna].astype(str).unique()
-                                
-                                # Encontrar índice do valor atual
                                 try:
+                                    # Encontrar posição do valor atual
                                     index_valor = np.where(valores == str(filtro["valor"]))[0]
-                                    index_valor = index_valor[0] if len(index_valor) > 0 else 0
+                                    if index_valor.size > 0:
+                                        index_valor = int(index_valor[0])  # Converter para int nativo
+                                    else:
+                                        index_valor = 0
                                 except:
                                     index_valor = 0
                                 
@@ -171,7 +172,7 @@ if st.session_state.autenticado:
                                     f"Valor #{i+1}", 
                                     valores, 
                                     key=f"val_{i}",
-                                    index=index_valor
+                                    index=index_valor  # Agora garantido ser int
                                 )
                                 st.session_state.filtros[i]["valor"] = valor
                         
