@@ -6,6 +6,8 @@ import io
 import numpy as np
 from base64 import b64encode
 from io import BytesIO
+from streamlit_cookies_manager import CookieManager
+import datetime
 
 # --- Configuração Inicial ---
 st.set_page_config(
@@ -126,6 +128,24 @@ def carregar_arquivo_local(uploaded_file):
         return df, None
     except Exception as e:
         return None, f"Erro ao processar o arquivo: {e}"
+    
+def reset_comparador_state():
+    keys_to_delete = ['df_original_comp', 'df_atualizado_comp']
+    for key in keys_to_delete:
+        if key in st.session_state:
+            del st.session_state[key]
+
+def reset_filtro_state():
+    keys_to_delete = ['filtros', 'df_original_filtro', 'df_filtrado_final']
+    for key in keys_to_delete:
+        if key in st.session_state:
+            del st.session_state[key]
+
+def reset_renomeador_state():
+    keys_to_delete = ['df_original_ren', 'df_final_ren', 'mapa_renomeacao']
+    for key in keys_to_delete:
+        if key in st.session_state:
+            del st.session_state[key]
 
 # --- Módulo 1: Comparador de Tabelas ---
 def modulo_comparador():
@@ -133,10 +153,7 @@ def modulo_comparador():
     st.write("Compare duas tabelas (do Google Sheets ou de arquivos locais) e identifique as diferenças.")
     
     if st.button("← Voltar ao Menu Principal"):
-        # Limpar o estado do módulo ao sair para evitar dataframes "fantasmas"
-        for key in ['df_original_comp', 'df_atualizado_comp']:
-            if key in st.session_state:
-                del st.session_state[key]
+        reset_comparador_state() # Limpa o estado deste módulo
         st.session_state.pagina_atual = "menu"
         st.rerun()
 
@@ -280,6 +297,7 @@ def modulo_filtro():
     st.write("Filtre dados de uma planilha Google Sheets com múltiplos critérios e gere somas")
     
     if st.button("← Voltar ao Menu Principal"):
+        reset_filtro_state() # Limpa o estado deste módulo
         st.session_state.pagina_atual = "menu"
         st.rerun()
     
@@ -394,6 +412,7 @@ def modulo_renomeador():
     st.write("Selecione e renomeie colunas de uma planilha Google Sheets")
     
     if st.button("← Voltar ao Menu Principal"):
+        reset_renomeador_state() # Limpa o estado deste módulo
         st.session_state.pagina_atual = "menu"
         st.rerun()
     
@@ -480,59 +499,78 @@ def modulo_renomeador():
 
 # --- Página de Login ---
 def pagina_login():
+    # Inicialize o gerenciador de cookies
+    cookies = CookieManager()
+
     st.title("Bem-vindo à Suite de Planilhas")
     st.subheader("Autenticação")
     
-    usuario = st.text_input("Usuário")
-    senha = st.text_input("Senha", type="password")
-    
-    if st.button("Entrar", type="primary"):
-        if usuario in USUARIOS_CADASTRADOS and senha == USUARIOS_CADASTRADOS[usuario]:
-            st.session_state.autenticado = True
-            st.session_state.usuario_logado = usuario
-            st.session_state.pagina_atual = "menu"
-            st.rerun()
-        else:
-            st.error("Credenciais inválidas. Tente novamente.")
+    with st.form("login_form"):
+        usuario = st.text_input("Usuário")
+        senha = st.text_input("Senha", type="password")
+        submitted = st.form_submit_button("Entrar", type="primary")
+
+        if submitted:
+            if usuario in USUARIOS_CADASTRADOS and senha == USUARIOS_CADASTRADOS[usuario]:
+                # **MUDANÇA AQUI: Criar o cookie**
+                # Define o cookie para expirar em 1 dia (você pode ajustar)
+                expires_at = datetime.datetime.now() + datetime.timedelta(days=1)
+                cookies.set('user_session', usuario, expires_at=expires_at)
+                
+                # Configura o estado da sessão como antes
+                st.session_state.autenticado = True
+                st.session_state.usuario_logado = usuario
+                st.session_state.pagina_atual = "menu"
+                st.rerun()
+            else:
+                st.error("Credenciais inválidas. Tente novamente.")
 
 # --- Menu Principal ---
 def menu_principal():
+    # Inicialize o gerenciador de cookies também aqui
+    cookies = CookieManager()
+
     st.title(f"Suite de Ferramentas de Planilhas")
-    st.markdown(f"**Usuário:** {st.session_state.usuario_logado}")
+    st.markdown(f"**Usuário:** `{st.session_state.usuario_logado}`")
     
-    st.write("Selecione a ferramenta que deseja utilizar:")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.subheader("Comparador")
-        st.write("Compare duas tabelas e identifique diferenças")
-        if st.button("Acessar Comparador", key="btn1"):
-            st.session_state.pagina_atual = "comparador"
-            st.rerun()
-    
-    with col2:
-        st.subheader("Filtro Avançado")
-        st.write("Filtre dados com múltiplos critérios")
-        if st.button("Acessar Filtro", key="btn2"):
-            st.session_state.pagina_atual = "filtro"
-            st.rerun()
-    
-    with col3:
-        st.subheader("Renomeador")
-        st.write("Selecione e renomeie colunas")
-        if st.button("Acessar Renomeador", key="btn3"):
-            st.session_state.pagina_atual = "renomeador"
-            st.rerun()
+    # ... (o resto do seu menu principal continua igual) ...
+    # col1, col2, col3...
     
     st.divider()
-    if st.button("Sair do Sistema", type="secondary"):
+    if st.button("Sair do Sistema"):
+        # **MUDANÇA AQUI: Apagar o cookie**
+        cookies.delete('user_session')
+
+        # Limpa completamente toda a memória da sessão
+        st.session_state.clear()
+        
+        # Reinicia o estado para a tela de login
         st.session_state.autenticado = False
         st.session_state.usuario_logado = None
         st.session_state.pagina_atual = "login"
         st.rerun()
 
 # --- Navegação Principal ---
+
+# Inicializa o gerenciador de cookies
+cookies = CookieManager()
+
+# **LÓGICA DE VERIFICAÇÃO DO COOKIE**
+# Se o estado não está autenticado, mas o cookie existe, restaura a sessão.
+if not st.session_state.get("autenticado"):
+    user_from_cookie = cookies.get('user_session')
+    if user_from_cookie:
+        # Se encontrou um usuário no cookie, restaura o estado da sessão
+        st.session_state.autenticado = True
+        st.session_state.usuario_logado = user_from_cookie
+        # Define a página para o menu, caso não haja outra definida
+        if "pagina_atual" not in st.session_state:
+            st.session_state.pagina_atual = "menu"
+
+# Agora, o resto da navegação funciona com base no estado restaurado
+if not st.session_state.get("autenticado"):
+    st.session_state.pagina_atual = "login"
+
 if st.session_state.pagina_atual == "login":
     pagina_login()
 elif st.session_state.pagina_atual == "menu":

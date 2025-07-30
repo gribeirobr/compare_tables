@@ -5,3 +5,4 @@ pyspark
 openpyxl
 gspread 
 gspread-dataframe
+streamlit-cookies-manager
