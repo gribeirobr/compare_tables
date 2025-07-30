@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import io
+import numpy as np
+from io import BytesIO
 
 USUARIOS_CADASTRADOS = {
     "admin": "1234",

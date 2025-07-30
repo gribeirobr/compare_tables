@@ -5,3 +5,5 @@ pyspark
 openpyxl
 gspread 
 gspread-dataframe
+numpy
+io
