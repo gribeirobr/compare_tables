@@ -926,48 +926,73 @@ def pagina_login():
                 st.error("Credenciais inválidas. Tente novamente.")
 
 
-# --- Menu Principal ---
-# --- Menu Principal ---
 def menu_principal():
     st.title(f"Ferramentas de Planilhas - GRB")
     st.markdown(f"**Usuário:** `{st.session_state.get('usuario_logado', 'Convidado')}`")
-    
     st.write("### Selecione a ferramenta que deseja utilizar:")
     
+    st.write("---")
+    st.subheader("Ferramentas Principais")
     col1, col2, col3 = st.columns(3)
-    
     with col1:
         with st.container(border=True):
+            st.subheader("Unificador")
+            st.write("Cruze informações de duas tabelas (PROCV).")
+            if st.button("Acessar Unificador", key="btn_unif", use_container_width=True):
+                st.session_state.pagina_atual = "unificador"
+                st.rerun()
+    with col2:
+        with st.container(border=True):
+            st.subheader("Agrupador")
+            st.write("Crie sumarizações e totais (Tabela Dinâmica).")
+            if st.button("Acessar Agrupador", key="btn_agrup", use_container_width=True):
+                st.session_state.pagina_atual = "agrupador"
+                st.rerun()
+    with col3:
+        with st.container(border=True):
+            st.subheader("Limpador")
+            st.write("Remova duplicatas, preencha vazios e padronize.")
+            if st.button("Acessar Limpador", key="btn_limp", use_container_width=True):
+                st.session_state.pagina_atual = "limpador"
+                st.rerun()
+    
+    st.write("---")
+    st.subheader("Ferramentas Adicionais")
+    col4, col5, col6, col7 = st.columns(4)
+    with col4:
+        with st.container(border=True):
+            st.subheader("Divisor")
+            st.write("Divida uma planilha em várias menores.")
+            if st.button("Acessar Divisor", key="btn_div", use_container_width=True):
+                st.session_state.pagina_atual = "divisor"
+                st.rerun()
+    with col5:
+        with st.container(border=True):
             st.subheader("Comparador")
-            st.write("Compare duas tabelas e identifique diferenças entre elas.")
+            st.write("Compare duas tabelas e veja as diferenças.")
             if st.button("Acessar Comparador", key="btn1", use_container_width=True):
                 st.session_state.pagina_atual = "comparador"
                 st.rerun()
-    
-    with col2:
+    with col6:
         with st.container(border=True):
             st.subheader("Filtro Avançado")
-            st.write("Filtre dados com múltiplos critérios e realize cálculos.")
+            st.write("Filtre dados com múltiplos critérios.")
             if st.button("Acessar Filtro", key="btn2", use_container_width=True):
                 st.session_state.pagina_atual = "filtro"
                 st.rerun()
-    
-    with col3:
+    with col7:
          with st.container(border=True):
             st.subheader("Renomeador")
-            st.write("Selecione, renomeie e organize as colunas da sua planilha.")
+            st.write("Renomeie e organize as colunas.")
             if st.button("Acessar Renomeador", key="btn3", use_container_width=True):
                 st.session_state.pagina_atual = "renomeador"
                 st.rerun()
     
     st.divider()
     if st.button("Sair do Sistema"):
-        # Apaga o cookie
         cookie_manager.set('user_session', '', expires_at=datetime.datetime.now() - datetime.timedelta(days=1))
-        
         st.session_state.clear()
         st.session_state.autenticado = False
-        st.session_state.usuario_logado = None
         st.session_state.pagina_atual = "login"
         st.rerun()
 
