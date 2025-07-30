@@ -30,107 +30,131 @@ if not st.session_state.autenticado:
     st.stop()
 
 if st.session_state.autenticado:
-    st.title("Filtro e Soma de Dados de Arquivo CSV")
+    # Configuração da página
+    st.set_page_config(page_title="Filtro e Soma de Planilhas", page_icon="📊", layout="wide")
+    st.title("📊 Filtro e Soma de Planilha Google Sheets")
 
-    st.markdown("---")
+    # Entrada de dados do usuário
+    with st.expander("🔑 Informações da Planilha", expanded=True):
+        spreadsheet_id = st.text_input("ID da Planilha", "")
+        gid = st.text_input("GID da Aba", "")
+        st.caption("Exemplo de URL: `https://docs.google.com/spreadsheets/d/[ID_AQUI]/edit#gid=[GID_AQUI]`")
 
-    # Função para carregar dados de arquivo CSV
-    @st.cache_data(ttl=600)  # Cache os dados por 10 minutos
-    def load_data_from_csv(uploaded_file):
+    # Carregar dados da planilha
+    def carregar_dados(spreadsheet_id, gid):
         try:
-            # Ler o arquivo CSV
-            df = pd.read_csv(uploaded_file)
-            
-            # Remover linhas e colunas completamente vazias
-            df.dropna(how='all', inplace=True)
-            df.dropna(axis=1, how='all', inplace=True)
-            
-            # Se houver cabeçalhos em branco, renomeá-los para evitar conflitos
-            df.columns = [f"Coluna_{i+1}" if col is None or str(col).strip() == "" else col for i, col in enumerate(df.columns)]
-            
+            url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid}"
+            df = pd.read_csv(url, encoding='utf-8-sig')
+            st.session_state.df_original = df
             return df
         except Exception as e:
-            st.error(f"Ocorreu um erro ao carregar os dados: {e}")
+            st.error(f"Erro ao carregar dados: {str(e)}")
             return None
 
-    # Upload do arquivo CSV
-    uploaded_file = st.file_uploader("Carregue seu arquivo CSV", type=["csv"])
+    # Processar dados e gerar resultados
+    def processar_dados(df, coluna_filtro, valor_filtro, coluna_soma):
+        try:
+            # Filtragem dos dados
+            df_filtrado = df[df[coluna_filtro].astype(str) == str(valor_filtro)]
+            
+            # Cálculo da soma
+            soma = df_filtrado[coluna_soma].sum()
+            
+            return df_filtrado, soma
+        except KeyError:
+            st.error("Erro: Uma ou mais colunas selecionadas não existem no DataFrame")
+            return None, None
+        except Exception as e:
+            st.error(f"Erro no processamento: {str(e)}")
+            return None, None
 
-    df = None
-    if uploaded_file is not None:
-        df = load_data_from_csv(uploaded_file)
-        
-        if df is not None and not df.empty:
-            st.success("Dados do arquivo carregados com sucesso!")
-            st.write("Prévia dos dados:")
-            st.dataframe(df.head())
+    # Gerar arquivo para download
+    def gerar_download(df, formato):
+        if formato == 'CSV':
+            return df.to_csv(index=False).encode('utf-8-sig')
+        elif formato == 'XLSX':
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name='Dados Filtrados')
+            return output.getvalue()
+
+    # Interface principal
+    if st.button("Carregar Planilha") or 'df_original' in st.session_state:
+        if not spreadsheet_id or not gid:
+            st.warning("⚠️ Por favor, informe o ID da planilha e o GID da aba")
+        else:
+            df = carregar_dados(spreadsheet_id, gid)
             
-            st.markdown("---")
-            
-            # Opções de filtro
-            st.header("Configurações de Filtro e Soma")
-            
-            columns = df.columns.tolist()
-            
-            col_to_filter = st.selectbox("Selecione a coluna para filtrar:", options=columns)
-            filter_value = st.text_input(f"Informe o valor para filtrar na coluna '{col_to_filter}':")
-            
-            col_to_sum = st.selectbox("Selecione a coluna para somar:", options=columns)
-            
-            st.markdown("---")
-            
-            # Aplicar filtro e soma
-            if st.button("Aplicar Filtro e Somar"):
-                if not filter_value:
-                    st.warning("Por favor, informe um valor para filtrar.")
-                else:
-                    try:
-                        # Tentar converter a coluna de soma para numérico, ignorando erros
-                        df[col_to_sum] = pd.to_numeric(df[col_to_sum], errors='coerce')
+            if df is not None:
+                st.success(f"✅ Dados carregados com sucesso! ({df.shape[0]} linhas, {df.shape[1]} colunas)")
+                
+                # Seleção das colunas
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    coluna_filtro = st.selectbox("Coluna para filtrar:", df.columns)
+                    # Obter valores únicos para o filtro
+                    valores_unicos = df[coluna_filtro].unique()
+                    valor_filtro = st.selectbox(f"Valor para filtrar em '{coluna_filtro}':", valores_unicos)
+                
+                with col2:
+                    colunas_numericas = df.select_dtypes(include=['number']).columns
+                    if len(colunas_numericas) == 0:
+                        st.warning("⚠️ Nenhuma coluna numérica encontrada para soma!")
+                        coluna_soma = None
+                    else:
+                        coluna_soma = st.selectbox("Coluna para somar:", colunas_numericas)
+                
+                if st.button("Aplicar Filtro e Calcular Soma") and coluna_soma is not None:
+                    df_filtrado, soma = processar_dados(df, coluna_filtro, valor_filtro, coluna_soma)
+                    
+                    if df_filtrado is not None:
+                        st.subheader("Resultados")
                         
-                        # Filtrar o DataFrame
-                        # Converte ambas as colunas para string para comparação consistente e case-insensitive
-                        filtered_df = df[df[col_to_filter].astype(str).str.contains(filter_value, case=False, na=False)]
+                        # Mostrar resultado da soma
+                        st.metric(f"Soma de '{coluna_soma}'", f"{soma:,.2f}")
                         
-                        if not filtered_df.empty:
-                            st.subheader("Resultado do Filtro:")
-                            st.dataframe(filtered_df)
-                            
-                            # Somar a coluna selecionada
-                            total_sum = filtered_df[col_to_sum].sum()
-                            st.success(f"Soma dos valores na coluna '{col_to_sum}' após o filtro: **{total_sum:,.2f}**")
-                            
-                            st.markdown("---")
-                            
-                            # Opções de Download
-                            st.subheader("Opções de Download")
-                            
-                            # Download CSV
-                            csv_buffer = io.StringIO()
-                            filtered_df.to_csv(csv_buffer, index=False)
+                        # Mostrar tabela filtrada
+                        st.dataframe(df_filtrado)
+                        
+                        # Download dos dados
+                        st.subheader("Download dos Dados Filtrados")
+                        col3, col4 = st.columns(2)
+                        
+                        with col3:
+                            csv = gerar_download(df_filtrado, 'CSV')
                             st.download_button(
-                                label="Download CSV",
-                                data=csv_buffer.getvalue(),
-                                file_name="dados_filtrados.csv",
-                                mime="text/csv"
+                                label="Baixar como CSV",
+                                data=csv,
+                                file_name='dados_filtrados.csv',
+                                mime='text/csv'
                             )
-                            
-                            # Download XLSX
-                            excel_buffer = io.BytesIO()
-                            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                                filtered_df.to_excel(writer, index=False, sheet_name='Dados Filtrados')
-                            excel_buffer.seek(0)
+                        
+                        with col4:
+                            excel = gerar_download(df_filtrado, 'XLSX')
                             st.download_button(
-                                label="Download XLSX",
-                                data=excel_buffer.getvalue(),
-                                file_name="dados_filtrados.xlsx",
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                label="Baixar como Excel",
+                                data=excel,
+                                file_name='dados_filtrados.xlsx',
+                                mime='application/vnd.ms-excel'
                             )
-                        else:
-                            st.warning("Nenhum registro encontrado com o filtro aplicado.")
-                    except KeyError:
-                        st.error(f"Coluna '{col_to_filter}' ou '{col_to_sum}' não encontrada. Verifique se os nomes das colunas estão corretos.")
-                    except Exception as e:
-                        st.error(f"Ocorreu um erro ao aplicar o filtro ou soma: {e}")
-        elif df is not None and df.empty:
-            st.warning("O arquivo carregado está vazio ou não contém dados válidos.")
+
+    # Instruções de uso
+    st.markdown("""
+    ---
+
+    ### 📌 Instruções de Uso:
+    1. Obtenha o **ID da Planilha** e **GID da Aba** da URL do Google Sheets:
+    - Formato da URL: `https://docs.google.com/spreadsheets/d/[ID_DA_PLANILHA]/edit#gid=[GID_DA_ABA]`
+    2. Cole os valores nos campos acima
+    3. Clique em **"Carregar Planilha"**
+    4. Selecione a coluna para filtrar e o valor desejado
+    5. Escolha a coluna numérica para soma
+    6. Clique em **"Aplicar Filtro e Calcular Soma"**
+    7. Faça o download dos resultados nos formatos disponíveis
+
+    > ⚠️ A planilha precisa estar configurada com acesso público (qualquer pessoa com o link pode visualizar)
+    """)
+
+    # Rodapé
+    st.caption("Desenvolvido com Streamlit | [Documentação do Streamlit](https://docs.streamlit.io/)")
