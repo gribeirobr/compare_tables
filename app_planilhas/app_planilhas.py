@@ -68,20 +68,22 @@ def gerar_download(df, filename, formato='excel'):
         return link_csv
 
 def carregar_planilha(sheet_id, gid):
+    """Carrega dados de uma planilha Google Sheets."""
+    if not sheet_id or not gid:
+        return None, "O ID da Planilha e o GID da Aba não podem estar vazios."
     try:
         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
         df = pd.read_csv(url, encoding='utf-8-sig')
         
-        # Converter colunas numéricas que podem estar como strings
         for col in df.columns:
             if df[col].dtype == object:
                 try:
-                    df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='ignore')
+                    df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='coerce').fillna(df[col])
                 except:
                     pass
         return df, None
     except Exception as e:
-        return None, str(e)
+        return None, f"Erro ao carregar do Google Sheets: Verifique o ID, GID e as permissões de compartilhamento da planilha. (Detalhe: {e})"
 
 def carregar_arquivo_local(uploaded_file):
     """Lê um arquivo CSV ou XLSX enviado pelo usuário e retorna um DataFrame."""
