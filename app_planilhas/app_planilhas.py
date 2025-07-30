@@ -151,7 +151,7 @@ def modulo_comparador():
             gid_original = st.text_input("GID da Aba (Tabela A)", key="comp_gid_a")
             if st.button("Carregar Tabela A", key="load_a"):
                 with st.spinner("Carregando Tabela A..."):
-                    df, erro = carregar_planilha_gsheet(spreadsheet_id_a, gid_original)
+                    df, erro = carregar_planilha(spreadsheet_id_a, gid_original)
                     if erro: st.error(f"Erro ao carregar Tabela A: {erro}")
                     else: 
                         st.session_state.df_original_comp = df
@@ -174,7 +174,7 @@ def modulo_comparador():
             gid_atualizado = st.text_input("GID da Aba (Tabela B)", key="comp_gid_b")
             if st.button("Carregar Tabela B", key="load_b"):
                  with st.spinner("Carregando Tabela B..."):
-                    df, erro = carregar_planilha_gsheet(spreadsheet_id_b, gid_atualizado)
+                    df, erro = carregar_planilha(spreadsheet_id_b, gid_atualizado)
                     if erro: st.error(f"Erro ao carregar Tabela B: {erro}")
                     else: 
                         st.session_state.df_atualizado_comp = df
