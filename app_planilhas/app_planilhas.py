@@ -689,12 +689,19 @@ def modulo_agrupador():
         df = st.session_state.df_original_agrup
         st.header("Passo 2: Configurar Agrupamento")
 
-        # --- ALTERAÇÃO PRINCIPAL: REMOVIDO O FILTRO DE COLUNAS ---
-        # O usuário agora pode selecionar QUALQUER coluna.
-        todas_as_colunas = df.columns.tolist()
-        
-        cols_agrupar = st.multiselect("Agrupar por (dimensões):", options=todas_as_colunas)
-        col_calcular = st.selectbox("Coluna para calcular (métrica):", options=todas_as_colunas) # <-- AQUI ESTÁ A MUDANÇA
+        # --- CORREÇÃO DEFINITIVA ---
+        # 1. Pegamos a lista de colunas diretamente do DataFrame. É a fonte mais segura.
+        lista_de_colunas = df.columns.tolist()
+
+        # 2. (OPCIONAL) Adicionamos uma linha para depuração, para ver exatamente o que o app está lendo.
+        with st.expander("Ver colunas detectadas pelo sistema"):
+            st.write(lista_de_colunas)
+            st.info(f"Total de colunas detectadas: {len(lista_de_colunas)}")
+
+        # 3. Usamos essa lista limpa e correta para popular os menus de seleção.
+        cols_agrupar = st.multiselect("Agrupar por (dimensões):", options=lista_de_colunas)
+        col_calcular = st.selectbox("Coluna para calcular (métrica):", options=lista_de_colunas)
+        # --- FIM DA CORREÇÃO ---
 
         mapa_funcoes = {"Soma": "sum", "Média": "mean", "Contagem": "count", "Valor Máximo": "max", "Valor Mínimo": "min"}
         funcoes = st.multiselect("Cálculos a fazer:", options=list(mapa_funcoes.keys()), default=["Soma"])
@@ -707,10 +714,8 @@ def modulo_agrupador():
                     with st.spinner("Calculando..."):
                         df_copia = df.copy()
                         
-                        # A conversão para número continua aqui como uma salvaguarda.
-                        # Se a coluna não for numérica, ela se tornará uma coluna de 'NaN' (nulos).
-                        # As funções de agregação (soma, média) ignoram nulos, resultando em 0 ou NaN,
-                        # o que evita que o programa quebre.
+                        # Salvaguarda: tenta converter a coluna escolhida para número.
+                        # Se não for possível, vira 'NaN' e os cálculos resultam em 0 ou NaN, sem quebrar.
                         df_copia[col_calcular] = pd.to_numeric(df_copia[col_calcular], errors='coerce')
                         
                         funcoes_pd = [mapa_funcoes[f] for f in funcoes]
