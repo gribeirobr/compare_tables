@@ -34,21 +34,18 @@ if st.session_state.autenticado:
         layout="wide"
     )
 
-    # --- Título e Descrição ---
-    st.title("🔧 Ferramenta para Renomear Colunas de Planilhas Google")
+    st.title("Renomear Colunas de Planilhas Google")
     st.markdown("""
     Esta aplicação permite que você carregue uma aba de uma Planilha Google, 
     selecione as colunas que deseja manter e as renomeie de forma fácil e rápida.
     """)
-
-        # --- Configuração da Página ---
+        
     st.set_page_config(
         page_title="Renomeador de Colunas de Planilhas Google",
         page_icon="✨",
         layout="wide"
     )
 
-    # --- Funções Auxiliares ---
 
     @st.cache_data
     def carregar_planilha(sheet_id, gid):
@@ -58,11 +55,10 @@ if st.session_state.autenticado:
         try:
             url = f'https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}'
             df = pd.read_csv(url)
-            return df, None # Retorna DataFrame e None para erro
+            return df, None 
         except Exception as e:
             return None, f"Ocorreu um erro ao carregar a planilha: {e}"
 
-    ## NOVO: Função para converter o DataFrame para o formato Excel em memória
     @st.cache_data
     def to_excel(df):
         """
@@ -74,22 +70,19 @@ if st.session_state.autenticado:
         processed_data = output.getvalue()
         return processed_data
 
-    # --- Inicialização do Session State ---
-    # O st.session_state guarda informações entre as interações do usuário
+
     if 'df_original' not in st.session_state:
         st.session_state.df_original = None
     if 'df_final' not in st.session_state:
         st.session_state.df_final = None
 
 
-    # --- Seção de Inputs do Usuário ---
     st.header("1. Informe os dados da sua planilha")
     st.warning(
         "*Importante:* Sua planilha precisa estar com o compartilhamento definido como '*Qualquer pessoa com o link*' para que a aplicação consiga acessá-la.",
         icon="⚠️"
     )
 
-    # Layout em colunas para os inputs
     col1, col2 = st.columns(2)
 
     with col1:
@@ -107,7 +100,6 @@ if st.session_state.autenticado:
     if st.button("Carregar Planilha", type="primary"):
         if google_sheet_id and google_sheet_gid:
             with st.spinner("Buscando e carregando os dados..."):
-                # Reseta os dataframes anteriores ao carregar uma nova planilha
                 st.session_state.df_original = None
                 st.session_state.df_final = None
 
@@ -120,7 +112,6 @@ if st.session_state.autenticado:
         else:
             st.error("Por favor, preencha o ID e o GID da planilha.")
 
-    # --- Seção de Seleção e Renomeação de Colunas ---
     if st.session_state.df_original is not None:
         st.header("2. Selecione e renomeie as colunas")
         
@@ -131,41 +122,33 @@ if st.session_state.autenticado:
         colunas_selecionadas = st.multiselect(
             "Selecione as colunas:",
             options=colunas_originais,
-            label_visibility="collapsed" # Esconde o rótulo para um visual mais limpo
+            label_visibility="collapsed" 
         )
 
-        # Dicionário para guardar os novos nomes
         mapa_renomeacao = {}
 
         if colunas_selecionadas:
             st.markdown("Agora, defina os novos nomes para as colunas selecionadas. (Deixe como está se não quiser renomear).")
             
-            # Cria um layout de colunas para a renomeação
             col_nome_original, col_nome_novo = st.columns(2)
             col_nome_original.markdown("*Nome Original*")
             col_nome_novo.markdown("*Novo Nome*")
 
             for coluna in colunas_selecionadas:
                 with col_nome_original:
-                    st.text(coluna) # Apenas exibe o nome original
+                    st.text(coluna) 
                 with col_nome_novo:
-                    # O key é importante para que o Streamlit identifique cada input de forma única
                     novo_nome = st.text_input(f"novo_nome_{coluna}", value=coluna, label_visibility="collapsed")
                     mapa_renomeacao[coluna] = novo_nome
             
             if st.button("Gerar Nova Planilha", type="primary"):
                 with st.spinner("Processando..."):
-                    # 1. Filtra o DataFrame para manter apenas as colunas selecionadas
                     df_filtrado = df_original[colunas_selecionadas]
                     
-                    # 2. Renomeia as colunas do DataFrame filtrado
                     df_renomeado = df_filtrado.rename(columns=mapa_renomeacao)
                     
-                    # Guarda o resultado final no session_state
                     st.session_state.df_final = df_renomeado
 
-
-    # --- Seção de Output ---
     if st.session_state.df_final is not None:
         st.header("3. Resultado Final")
         st.success("Sua nova planilha está pronta!")
@@ -173,14 +156,11 @@ if st.session_state.autenticado:
         df_final = st.session_state.df_final
         st.dataframe(df_final)
 
-        # --- Botões de Download ---
         st.subheader("Faça o download do resultado")
 
-        # Prepara os dados para ambos os formatos
         csv_data = df_final.to_csv(index=False).encode('utf-8')
-        excel_data = to_excel(df_final)  ## NOVO: Chama a função para gerar o Excel
+        excel_data = to_excel(df_final)  
 
-        # Layout em colunas para os botões
         dl_col1, dl_col2 = st.columns(2)
 
         with dl_col1:
@@ -192,7 +172,6 @@ if st.session_state.autenticado:
             use_container_width=True
             )
 
-        ## NOVO: Bloco do botão de download para Excel
         with dl_col2:
             st.download_button(
             label="📊 Baixar como XLSX (Excel)",
