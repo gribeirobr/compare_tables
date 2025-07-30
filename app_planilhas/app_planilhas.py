@@ -425,6 +425,8 @@ def modulo_renomeador():
         st.session_state.df_final_ren = None
     if 'mapa_renomeacao' not in st.session_state:
         st.session_state.mapa_renomeacao = {}
+        
+    st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
 
     with st.expander("Passo 1: Carregar Dados", expanded=True):
         origem = st.radio("Origem da Planilha", ["Google Sheets", "Upload de Arquivo"], key="ren_origem")
