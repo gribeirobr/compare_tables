@@ -498,10 +498,7 @@ def modulo_renomeador():
             st.markdown(gerar_download(st.session_state.df_final_ren, "planilha_renomeada", 'ambos'), unsafe_allow_html=True)
 
 # --- Página de Login ---
-def pagina_login():
-    # Inicialize o gerenciador de cookies
-    cookies = CookieManager()
-
+def pagina_login(cookies):  # Recebe 'cookies' como argumento
     st.title("Bem-vindo à Suite de Planilhas")
     st.subheader("Autenticação")
     
@@ -512,12 +509,9 @@ def pagina_login():
 
         if submitted:
             if usuario in USUARIOS_CADASTRADOS and senha == USUARIOS_CADASTRADOS[usuario]:
-                # **MUDANÇA AQUI: Criar o cookie**
-                # Define o cookie para expirar em 1 dia (você pode ajustar)
                 expires_at = datetime.datetime.now() + datetime.timedelta(days=1)
                 cookies.set('user_session', usuario, expires_at=expires_at)
                 
-                # Configura o estado da sessão como antes
                 st.session_state.autenticado = True
                 st.session_state.usuario_logado = usuario
                 st.session_state.pagina_atual = "menu"
@@ -525,59 +519,58 @@ def pagina_login():
             else:
                 st.error("Credenciais inválidas. Tente novamente.")
 
-# --- Menu Principal ---
-def menu_principal():
-    # Inicialize o gerenciador de cookies também aqui
-    cookies = CookieManager()
 
+# --- Menu Principal ---
+def menu_principal(cookies):  # Recebe 'cookies' como argumento
     st.title(f"Suite de Ferramentas de Planilhas")
     st.markdown(f"**Usuário:** `{st.session_state.usuario_logado}`")
     
-    # ... (o resto do seu menu principal continua igual) ...
-    # col1, col2, col3...
+    # ... (todo o resto do seu código do menu fica aqui) ...
     
     st.divider()
     if st.button("Sair do Sistema"):
-        # **MUDANÇA AQUI: Apagar o cookie**
         cookies.delete('user_session')
-
-        # Limpa completamente toda a memória da sessão
         st.session_state.clear()
         
-        # Reinicia o estado para a tela de login
         st.session_state.autenticado = False
         st.session_state.usuario_logado = None
         st.session_state.pagina_atual = "login"
         st.rerun()
 
-# --- Navegação Principal ---
+# --- Bloco Principal de Navegação (Substitua o seu por este) ---
 
-# Inicializa o gerenciador de cookies
-cookies = CookieManager()
+def main():
+    # 1. Crie o CookieManager APENAS AQUI, uma única vez.
+    #    A chave é essencial para evitar o erro de duplicação.
+    cookies = CookieManager(key='streamlit_cookies_manager_key_geral_app')
 
-# **LÓGICA DE VERIFICAÇÃO DO COOKIE**
-# Se o estado não está autenticado, mas o cookie existe, restaura a sessão.
-if not st.session_state.get("autenticado"):
-    user_from_cookie = cookies.get('user_session')
-    if user_from_cookie:
-        # Se encontrou um usuário no cookie, restaura o estado da sessão
-        st.session_state.autenticado = True
-        st.session_state.usuario_logado = user_from_cookie
-        # Define a página para o menu, caso não haja outra definida
-        if "pagina_atual" not in st.session_state:
-            st.session_state.pagina_atual = "menu"
+    # 2. Lógica de verificação do cookie para manter a sessão
+    if not st.session_state.get("autenticado"):
+        user_from_cookie = cookies.get('user_session')
+        if user_from_cookie:
+            st.session_state.autenticado = True
+            st.session_state.usuario_logado = user_from_cookie
+            if "pagina_atual" not in st.session_state:
+                st.session_state.pagina_atual = "menu"
 
-# Agora, o resto da navegação funciona com base no estado restaurado
-if not st.session_state.get("autenticado"):
-    st.session_state.pagina_atual = "login"
+    # 3. Define a página atual com base no estado de autenticação
+    if not st.session_state.get("autenticado"):
+        st.session_state.pagina_atual = "login"
 
-if st.session_state.pagina_atual == "login":
-    pagina_login()
-elif st.session_state.pagina_atual == "menu":
-    menu_principal()
-elif st.session_state.pagina_atual == "comparador":
-    modulo_comparador()
-elif st.session_state.pagina_atual == "filtro":
-    modulo_filtro()
-elif st.session_state.pagina_atual == "renomeador":
-    modulo_renomeador()
+    # 4. Chama a função da página correta, passando os cookies se necessário
+    pagina = st.session_state.get("pagina_atual", "login")
+
+    if pagina == "login":
+        pagina_login(cookies)
+    elif pagina == "menu":
+        menu_principal(cookies)
+    elif pagina == "comparador":
+        modulo_comparador()
+    elif pagina == "filtro":
+        modulo_filtro()
+    elif pagina == "renomeador":
+        modulo_renomeador()
+
+# Chama a função principal para rodar a aplicação
+if __name__ == "__main__":
+    main()
