@@ -13,7 +13,7 @@ cookie_manager = stc.CookieManager()
 
 # --- Configuração Inicial ---
 st.set_page_config(
-    page_title="Suite de Ferramentas de Planilhas",
+    page_title="Ferramentas de Planilhas - GRB",
     layout="wide"
 )
 
@@ -166,7 +166,7 @@ def modulo_comparador():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.header("Tabela A (Original)")
+        st.header("Tabela A")
         origem_a = st.radio("Origem da Tabela A", ["Google Sheets", "Upload de Arquivo"], key="origem_a")
         if origem_a == "Google Sheets":
             spreadsheet_id_a = st.text_input("ID da Planilha (Tabela A)", key="comp_id_a")
@@ -189,7 +189,7 @@ def modulo_comparador():
                         st.success(f"Arquivo da Tabela A carregado ({df.shape[0]} linhas).")
 
     with col2:
-        st.header("Tabela B (Atualizada)")
+        st.header("Tabela B")
         origem_b = st.radio("Origem da Tabela B", ["Google Sheets", "Upload de Arquivo"], key="origem_b")
         if origem_b == "Google Sheets":
             spreadsheet_id_b = st.text_input("ID da Planilha (Tabela B)", key="comp_id_b")
@@ -296,7 +296,7 @@ def modulo_comparador():
 # --- Módulo 2: Filtro Avançado ---
 def modulo_filtro():
     st.title("Filtro Avançado de Planilhas")
-    st.write("Filtre dados de uma planilha Google Sheets com múltiplos critérios e gere somas")
+    st.write("Filtre dados de uma planilha (do Google Sheets ou de arquivos locais) com múltiplos critérios e gere somas")
     
     if st.button("← Voltar ao Menu Principal"):
         reset_filtro_state() # Limpa o estado deste módulo
@@ -411,7 +411,7 @@ def modulo_filtro():
 # --- Módulo 3: Renomeador de Colunas ---
 def modulo_renomeador():
     st.title("Renomeador de Colunas")
-    st.write("Selecione e renomeie colunas de uma planilha Google Sheets")
+    st.write("Selecione e renomeie colunas de uma planilha (do Google Sheets ou de arquivos locais)")
     
     if st.button("← Voltar ao Menu Principal"):
         reset_renomeador_state() # Limpa o estado deste módulo
@@ -501,7 +501,7 @@ def modulo_renomeador():
 
 # --- Página de Login ---
 def pagina_login():
-    st.title("Bem-vindo à Suite de Planilhas")
+    st.title("Ferramentas de Planilhas - GRB")
     st.subheader("Autenticação")
     
     with st.form("login_form"):
@@ -529,7 +529,7 @@ def pagina_login():
 # --- Menu Principal ---
 # --- Menu Principal ---
 def menu_principal():
-    st.title(f"Suite de Ferramentas de Planilhas")
+    st.title(f"Ferramentas de Planilhas - GRB")
     st.markdown(f"**Usuário:** `{st.session_state.get('usuario_logado', 'Convidado')}`")
     
     st.write("### Selecione a ferramenta que deseja utilizar:")
