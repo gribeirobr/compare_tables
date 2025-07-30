@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-import gspread
-from gspread_dataframe import get_as_dataframe
 import io
 
 USUARIOS_CADASTRADOS = {
@@ -31,27 +29,17 @@ if not st.session_state.autenticado:
             st.error("Usuário ou senha incorretos.")
     st.stop()
 
-
 if st.session_state.autenticado:
-    st.title("Filtro e Soma de Dados de Planilha Google")
+    st.title("Filtro e Soma de Dados de Arquivo CSV")
 
     st.markdown("---")
 
-    # Função para carregar dados da planilha Google
-    @st.cache_data(ttl=600) # Cache os dados por 10 minutos
-    def load_data_from_google_sheet(spreadsheet_id, worksheet_gid):
+    # Função para carregar dados de arquivo CSV
+    @st.cache_data(ttl=600)  # Cache os dados por 10 minutos
+    def load_data_from_csv(uploaded_file):
         try:
-            # Autenticação com as credenciais do Streamlit Secrets
-            gc = gspread.service_account_from_dict(st.secrets["gsheets"])
-            
-            # Abrir a planilha pelo ID
-            spreadsheet = gc.open_by_id(spreadsheet_id)
-            
-            # Selecionar a aba pelo GID
-            worksheet = spreadsheet.get_worksheet_by_id(worksheet_gid)
-            
-            # Obter os dados como um DataFrame do Pandas
-            df = get_as_dataframe(worksheet)
+            # Ler o arquivo CSV
+            df = pd.read_csv(uploaded_file)
             
             # Remover linhas e colunas completamente vazias
             df.dropna(how='all', inplace=True)
@@ -61,26 +49,19 @@ if st.session_state.autenticado:
             df.columns = [f"Coluna_{i+1}" if col is None or str(col).strip() == "" else col for i, col in enumerate(df.columns)]
             
             return df
-        except gspread.exceptions.SpreadsheetNotFound:
-            st.error(f"Erro: Planilha com ID '{spreadsheet_id}' não encontrada. Verifique o ID.")
-            return None
-        except gspread.exceptions.WorksheetNotFound:
-            st.error(f"Erro: Aba com GID '{worksheet_gid}' não encontrada. Verifique o GID.")
-            return None
         except Exception as e:
             st.error(f"Ocorreu um erro ao carregar os dados: {e}")
             return None
 
-    # Entrada do usuário para o ID da planilha e GID da aba
-    spreadsheet_id = st.text_input("Informe o ID da Planilha Google:", help="Você pode encontrar o ID na URL da sua planilha (ex: 1ABC...XYZ)")
-    worksheet_gid = st.text_input("Informe o GID da Aba da Planilha:", help="O GID é um número na URL da aba após '#gid='")
+    # Upload do arquivo CSV
+    uploaded_file = st.file_uploader("Carregue seu arquivo CSV", type=["csv"])
 
     df = None
-    if spreadsheet_id and worksheet_gid:
-        df = load_data_from_google_sheet(spreadsheet_id, int(worksheet_gid)) # Converte GID para int
+    if uploaded_file is not None:
+        df = load_data_from_csv(uploaded_file)
         
         if df is not None and not df.empty:
-            st.success("Dados da planilha carregados com sucesso!")
+            st.success("Dados do arquivo carregados com sucesso!")
             st.write("Prévia dos dados:")
             st.dataframe(df.head())
             
@@ -152,4 +133,4 @@ if st.session_state.autenticado:
                     except Exception as e:
                         st.error(f"Ocorreu um erro ao aplicar o filtro ou soma: {e}")
         elif df is not None and df.empty:
-            st.warning("A planilha carregada está vazia ou não contém dados válidos.")
+            st.warning("O arquivo carregado está vazio ou não contém dados válidos.")
