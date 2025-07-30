@@ -368,7 +368,6 @@ def modulo_filtro():
                         if df is not None:
                             st.session_state.df_original_filtro = df
                             st.success(f"Dados carregados! ({df.shape[0]} linhas)")
-                            st.rerun()
                         else:
                             st.error(f"Erro: {error}")
                 else:
@@ -381,7 +380,6 @@ def modulo_filtro():
                     if df is not None:
                         st.session_state.df_original_filtro = df
                         st.success(f"Arquivo carregado! ({df.shape[0]} linhas)")
-                        st.rerun()
                     else:
                         st.error(f"Erro: {error}")
     
@@ -488,7 +486,7 @@ def modulo_renomeador():
                             st.session_state.df_original_ren = df
                             st.session_state.mapa_renomeacao = {col: col for col in df.columns}
                             st.success("Dados carregados com sucesso!")
-                            st.rerun()
+                            
                         else:
                             st.error(f"Erro: {erro}")
                 else:
@@ -502,7 +500,7 @@ def modulo_renomeador():
                         st.session_state.df_original_ren = df
                         st.session_state.mapa_renomeacao = {col: col for col in df.columns}
                         st.success("Arquivo carregado com sucesso!")
-                        st.rerun()
+                        
                     else:
                         st.error(f"Erro: {erro}")
 
@@ -677,7 +675,7 @@ def modulo_agrupador():
                 else: 
                     st.session_state.df_original_agrup = df
                     st.success("Planilha carregada!")
-                    st.rerun()
+                    
         else:
             upload = st.file_uploader("Selecione um arquivo", type=['csv','xlsx'], key="agrup_upload")
             if upload:
@@ -686,7 +684,7 @@ def modulo_agrupador():
                 else: 
                     st.session_state.df_original_agrup = df
                     st.success("Planilha carregada!")
-                    st.rerun()
+                    
 
     # Passo 2: Configurar agrupamento
     if 'df_original_agrup' in st.session_state:
@@ -746,7 +744,7 @@ def modulo_limpador():
                 if erro: st.error(erro)
                 else: 
                     st.session_state.df_original_limp = df
-                    st.success("Carregado!"); st.rerun()
+                    st.success("Carregado!"); 
         else:
             up = st.file_uploader("Arquivo", type=['csv','xlsx'], key="limp_upload")
             if up:
@@ -754,7 +752,7 @@ def modulo_limpador():
                 if erro: st.error(erro)
                 else: 
                     st.session_state.df_original_limp = df
-                    st.success("Carregado!"); st.rerun()
+                    st.success("Carregado!"); 
 
     # Passo 2: Configurar limpeza
     if 'df_original_limp' in st.session_state:
@@ -848,7 +846,7 @@ def modulo_divisor():
                 if erro: st.error(erro)
                 else: 
                     st.session_state.df_original_div = df
-                    st.success("Carregado!"); st.rerun()
+                    st.success("Carregado!"); 
         else:
             up = st.file_uploader("Arquivo", type=['csv','xlsx'], key="div_upload")
             if up:
@@ -856,7 +854,7 @@ def modulo_divisor():
                 if erro: st.error(erro)
                 else: 
                     st.session_state.df_original_div = df
-                    st.success("Carregado!"); st.rerun()
+                    st.success("Carregado!"); 
 
     # Passo 2: Configurar Divisão
     if 'df_original_div' in st.session_state:
