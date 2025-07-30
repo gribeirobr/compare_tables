@@ -6,10 +6,10 @@ import io
 import numpy as np
 from base64 import b64encode
 from io import BytesIO
-from streamlit_cookies_manager import CookieManager
+import extra_streamlit_components as stc
 import datetime
 
-cookies = CookieManager()
+cookie_manager = stc.CookieManager()
 
 # --- Configuração Inicial ---
 st.set_page_config(
@@ -499,7 +499,8 @@ def modulo_renomeador():
             st.subheader("Baixar Planilha Renomeada")
             st.markdown(gerar_download(st.session_state.df_final_ren, "planilha_renomeada", 'ambos'), unsafe_allow_html=True)
 
-def pagina_login(): # << Argumento 'cookies' removido
+# --- Página de Login ---
+def pagina_login():
     st.title("Bem-vindo à Suite de Planilhas")
     st.subheader("Autenticação")
     
@@ -510,9 +511,12 @@ def pagina_login(): # << Argumento 'cookies' removido
 
         if submitted:
             if usuario in USUARIOS_CADASTRADOS and senha == USUARIOS_CADASTRADOS[usuario]:
-                expires_at = datetime.datetime.now() + datetime.timedelta(days=1)
-                # A função usa a variável 'cookies' global
-                cookies.set('user_session', usuario, expires_at=expires_at) 
+                # **NOVA FORMA DE DEFINIR O COOKIE**
+                cookie_manager.set(
+                    'user_session', 
+                    usuario, 
+                    expires_at=datetime.datetime.now() + datetime.timedelta(days=1)
+                )
                 
                 st.session_state.autenticado = True
                 st.session_state.usuario_logado = usuario
@@ -523,18 +527,18 @@ def pagina_login(): # << Argumento 'cookies' removido
 
 
 # --- Menu Principal ---
-def menu_principal(): # << Argumento 'cookies' removido
+def menu_principal():
     st.title(f"Suite de Ferramentas de Planilhas")
     st.markdown(f"**Usuário:** `{st.session_state.usuario_logado}`")
     
-    # ... (todo o resto do seu código do menu fica aqui) ...
+    # ... (o resto do seu menu fica aqui) ...
     
     st.divider()
     if st.button("Sair do Sistema"):
-        # A função usa a variável 'cookies' global
-        cookies.delete('user_session') 
-        st.session_state.clear()
+        # **NOVA FORMA DE APAGAR O COOKIE**
+        cookie_manager.set('user_session', '', expires_at=datetime.datetime.now() - datetime.timedelta(days=1))
         
+        st.session_state.clear()
         st.session_state.autenticado = False
         st.session_state.usuario_logado = None
         st.session_state.pagina_atual = "login"
@@ -542,11 +546,11 @@ def menu_principal(): # << Argumento 'cookies' removido
 
 # --- Bloco Principal de Navegação ---
 
-# Lógica de verificação do cookie para manter a sessão
+# Lógica para obter o cookie. É executada em cada interação.
+user_from_cookie = cookie_manager.get('user_session')
+
 # Se o estado não está autenticado, mas o cookie existe, restaura a sessão.
 if not st.session_state.get("autenticado"):
-    # Acessa a variável 'cookies' global
-    user_from_cookie = cookies.get('user_session') 
     if user_from_cookie:
         st.session_state.autenticado = True
         st.session_state.usuario_logado = user_from_cookie
@@ -561,9 +565,9 @@ if not st.session_state.get("autenticado"):
 pagina = st.session_state.get("pagina_atual", "login")
 
 if pagina == "login":
-    pagina_login() # Não precisa mais passar 'cookies'
+    pagina_login()
 elif pagina == "menu":
-    menu_principal() # Não precisa mais passar 'cookies'
+    menu_principal()
 elif pagina == "comparador":
     modulo_comparador()
 elif pagina == "filtro":
