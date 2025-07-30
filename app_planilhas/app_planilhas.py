@@ -8,6 +8,7 @@ from base64 import b64encode
 from io import BytesIO
 import extra_streamlit_components as stc
 import datetime
+import zipfile
 
 cookie_manager = stc.CookieManager()
 
@@ -134,6 +135,28 @@ def carregar_arquivo_local(uploaded_file):
     except Exception as e:
         return None, f"Erro ao processar o arquivo: {e}"
     
+def gerar_download_zip(dfs_dict, formato_arquivo):
+    """Gera um arquivo zip em memória contendo múltiplos DataFrames."""
+    zip_buffer = io.BytesIO()
+    ext = 'csv' if formato_arquivo == 'CSV' else 'xlsx'
+    
+    with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED, False) as zip_file:
+        for filename, df in dfs_dict.items():
+            if formato_arquivo == 'CSV':
+                # Salva como CSV
+                csv_data = df.to_csv(index=False).encode('utf-8-sig')
+                zip_file.writestr(f'{filename}.{ext}', csv_data)
+            else:
+                # Salva como XLSX
+                excel_buffer = io.BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Dados')
+                excel_buffer.seek(0)
+                zip_file.writestr(f'{filename}.{ext}', excel_buffer.getvalue())
+
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue()
+    
 def reset_comparador_state():
     keys_to_delete = ['df_original_comp', 'df_atualizado_comp']
     for key in keys_to_delete:
@@ -151,6 +174,22 @@ def reset_renomeador_state():
     for key in keys_to_delete:
         if key in st.session_state:
             del st.session_state[key]
+
+def reset_unificador_state():
+    for key in ['df_a_unif', 'df_b_unif', 'df_unificado_final']:
+        if key in st.session_state: del st.session_state[key]
+
+def reset_agrupador_state():
+    for key in ['df_original_agrup', 'df_agrupado_final']:
+        if key in st.session_state: del st.session_state[key]
+
+def reset_limpador_state():
+    for key in ['df_original_limp', 'df_limpo_final', 'limpeza_acoes']:
+        if key in st.session_state: del st.session_state[key]
+
+def reset_divisor_state():
+    for key in ['df_original_div', 'dados_zip_div']:
+        if key in st.session_state: del st.session_state[key]
 
 # --- Módulo 1: Comparador de Tabelas ---
 def modulo_comparador():
@@ -507,6 +546,358 @@ def modulo_renomeador():
             
             st.subheader("Baixar Planilha Renomeada")
             st.markdown(gerar_download(st.session_state.df_final_ren, "planilha_renomeada", 'ambos'), unsafe_allow_html=True)
+
+def modulo_unificador():
+    st.title("Unificador de Tabelas (PROCV/VLOOKUP Inteligente)")
+    st.write("Cruze informações de duas tabelas com base em uma coluna em comum.")
+    
+    if st.button("← Voltar ao Menu Principal"):
+        reset_unificador_state()
+        st.session_state.pagina_atual = "menu"
+        st.rerun()
+
+    st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
+
+    # Passo 1: Carregar as duas tabelas
+    col1, col2 = st.columns(2)
+    with col1:
+        st.header("Tabela A (Esquerda)")
+        origem_a = st.radio("Origem", ["Google Sheets", "Upload"], key="unif_origem_a")
+        if origem_a == "Google Sheets":
+            id_a = st.text_input("ID da Planilha A", key="unif_id_a", help=HELP_TEXT_SHEET_ID)
+            gid_a = st.text_input("GID da Aba A", key="unif_gid_a", help=HELP_TEXT_GID)
+            if st.button("Carregar Tabela A"):
+                df, erro = carregar_planilha(id_a, gid_a)
+                if erro: st.error(erro)
+                else: 
+                    st.session_state.df_a_unif = df
+                    st.success(f"Tabela A carregada ({df.shape[0]} linhas).")
+        else:
+            up_a = st.file_uploader("Arquivo da Tabela A", type=['csv','xlsx'], key="unif_up_a")
+            if up_a:
+                df, erro = carregar_arquivo_local(up_a)
+                if erro: st.error(erro)
+                else: 
+                    st.session_state.df_a_unif = df
+                    st.success(f"Tabela A carregada ({df.shape[0]} linhas).")
+
+    with col2:
+        st.header("Tabela B (Direita)")
+        origem_b = st.radio("Origem", ["Google Sheets", "Upload"], key="unif_origem_b")
+        if origem_b == "Google Sheets":
+            id_b = st.text_input("ID da Planilha B", key="unif_id_b", help=HELP_TEXT_SHEET_ID)
+            gid_b = st.text_input("GID da Aba B", key="unif_gid_b", help=HELP_TEXT_GID)
+            if st.button("Carregar Tabela B"):
+                df, erro = carregar_planilha(id_b, gid_b)
+                if erro: st.error(erro)
+                else:
+                    st.session_state.df_b_unif = df
+                    st.success(f"Tabela B carregada ({df.shape[0]} linhas).")
+        else:
+            up_b = st.file_uploader("Arquivo da Tabela B", type=['csv','xlsx'], key="unif_up_b")
+            if up_b:
+                df, erro = carregar_arquivo_local(up_b)
+                if erro: st.error(erro)
+                else:
+                    st.session_state.df_b_unif = df
+                    st.success(f"Tabela B carregada ({df.shape[0]} linhas).")
+
+    # Passo 2: Configurar a unificação
+    if 'df_a_unif' in st.session_state and 'df_b_unif' in st.session_state:
+        df_a = st.session_state.df_a_unif
+        df_b = st.session_state.df_b_unif
+        st.divider()
+        st.header("Passo 2: Configurar a Unificação")
+        
+        col_cfg1, col_cfg2 = st.columns(2)
+        with col_cfg1:
+            key_a = st.selectbox("Coluna-chave da Tabela A", df_a.columns)
+            tipo_uniao = st.radio("Tipo de União", 
+                options=['Manter todos da Tabela A (Left Join)', 'Manter apenas correspondências (Inner Join)'],
+                captions=["Traz informações da Tabela B para a A. O mais comum.", "Mantém apenas as linhas que existem em ambas as tabelas."])
+        with col_cfg2:
+            key_b = st.selectbox("Coluna-chave da Tabela B", df_b.columns)
+            cols_b = st.multiselect("Quais colunas da Tabela B você quer adicionar?", df_b.columns, default=list(df_b.columns))
+
+        if st.button("Unificar Tabelas", type="primary"):
+            if not key_a or not key_b or not cols_b:
+                st.warning("Por favor, selecione as colunas-chave e as colunas da Tabela B.")
+            else:
+                try:
+                    with st.spinner("Unificando..."):
+                        # Mapeia a opção do rádio para o parâmetro do pandas
+                        how_param = 'left' if 'Left Join' in tipo_uniao else 'inner'
+                        
+                        # Garante que a coluna chave da Tabela B esteja na lista de colunas a serem puxadas
+                        if key_b not in cols_b:
+                            cols_b.insert(0, key_b)
+
+                        df_final = pd.merge(
+                            left=df_a,
+                            right=df_b[cols_b],
+                            left_on=key_a,
+                            right_on=key_b,
+                            how=how_param,
+                            suffixes=('_A', '_B') # Adiciona sufixo se houver colunas com mesmo nome
+                        )
+                        st.session_state.df_unificado_final = df_final
+                        st.success("Tabelas unificadas com sucesso!")
+                except Exception as e:
+                    st.error(f"Ocorreu um erro na unificação: {e}")
+
+    # Passo 3: Mostrar resultado
+    if 'df_unificado_final' in st.session_state:
+        st.divider()
+        st.header("Resultado da Unificação")
+        df_resultado = st.session_state.df_unificado_final
+        st.write(f"A tabela final possui **{df_resultado.shape[0]} linhas** e **{df_resultado.shape[1]} colunas**.")
+        st.dataframe(df_resultado)
+        st.markdown(gerar_download(df_resultado, "planilha_unificada"), unsafe_allow_html=True)
+
+def modulo_agrupador():
+    st.title("Agrupador e Sumarizador (Tabela Dinâmica)")
+    st.write("Agrupe dados por categorias e realize cálculos como soma, média, contagem, etc.")
+
+    if st.button("← Voltar ao Menu Principal"):
+        reset_agrupador_state()
+        st.session_state.pagina_atual = "menu"
+        st.rerun()
+
+    st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
+
+    # Passo 1: Carregar dados
+    with st.expander("Passo 1: Carregar Dados", expanded=('df_original_agrup' not in st.session_state)):
+        origem = st.radio("Origem da Planilha", ["Google Sheets", "Upload de Arquivo"], key="agrup_origem")
+        if origem == "Google Sheets":
+            id_sheet = st.text_input("ID da Planilha", key="agrup_id", help=HELP_TEXT_SHEET_ID)
+            gid_sheet = st.text_input("GID da Aba", key="agrup_gid", help=HELP_TEXT_GID)
+            if st.button("Carregar Dados"):
+                df, erro = carregar_planilha(id_sheet, gid_sheet)
+                if erro: st.error(erro)
+                else: 
+                    st.session_state.df_original_agrup = df
+                    st.success("Planilha carregada!")
+                    st.rerun()
+        else:
+            upload = st.file_uploader("Selecione um arquivo", type=['csv','xlsx'], key="agrup_upload")
+            if upload:
+                df, erro = carregar_arquivo_local(upload)
+                if erro: st.error(erro)
+                else: 
+                    st.session_state.df_original_agrup = df
+                    st.success("Planilha carregada!")
+                    st.rerun()
+
+    # Passo 2: Configurar agrupamento
+    if 'df_original_agrup' in st.session_state:
+        df = st.session_state.df_original_agrup
+        st.header("Passo 2: Configurar Agrupamento")
+        
+        colunas_numericas = df.select_dtypes(include=np.number).columns.tolist()
+        colunas_texto = df.select_dtypes(include='object').columns.tolist()
+
+        cols_agrupar = st.multiselect("Agrupar por (dimensões):", options=df.columns)
+        col_calcular = st.selectbox("Coluna para calcular (métrica):", options=colunas_numericas)
+        
+        mapa_funcoes = {"Soma": "sum", "Média": "mean", "Contagem": "count", "Valor Máximo": "max", "Valor Mínimo": "min"}
+        funcoes = st.multiselect("Cálculos a fazer:", options=list(mapa_funcoes.keys()), default="Soma")
+
+        if st.button("Agrupar e Calcular", type="primary"):
+            if not cols_agrupar or not col_calcular or not funcoes:
+                st.warning("Por favor, preencha todos os campos de configuração.")
+            else:
+                try:
+                    with st.spinner("Calculando..."):
+                        funcoes_pd = [mapa_funcoes[f] for f in funcoes]
+                        df_agrupado = df.groupby(cols_agrupar)[col_calcular].agg(funcoes_pd).reset_index()
+                        st.session_state.df_agrupado_final = df_agrupado
+                        st.success("Agrupamento concluído!")
+                except Exception as e:
+                    st.error(f"Erro ao agrupar: {e}")
+
+    # Passo 3: Exibir resultados
+    if 'df_agrupado_final' in st.session_state:
+        st.divider()
+        st.header("Resultado do Agrupamento")
+        df_resultado = st.session_state.df_agrupado_final
+        st.dataframe(df_resultado)
+        st.markdown(gerar_download(df_resultado, "dados_agrupados"), unsafe_allow_html=True)
+
+def modulo_limpador():
+    st.title("Limpador e Padronizador de Dados")
+    st.write("Aplique diversas ações de limpeza para melhorar a qualidade da sua planilha.")
+    
+    if st.button("← Voltar ao Menu Principal"):
+        reset_limpador_state()
+        st.session_state.pagina_atual = "menu"
+        st.rerun()
+
+    st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
+
+    # Passo 1: Carregar dados
+    with st.expander("Passo 1: Carregar Planilha", expanded=('df_original_limp' not in st.session_state)):
+        # (código de carregamento igual ao módulo agrupador, com chaves 'limp_*')
+        origem = st.radio("Origem", ["Google Sheets", "Upload"], key="limp_origem")
+        if origem == "Google Sheets":
+            id_s = st.text_input("ID Planilha", key="limp_id", help=HELP_TEXT_SHEET_ID)
+            gid_s = st.text_input("GID Aba", key="limp_gid", help=HELP_TEXT_GID)
+            if st.button("Carregar"):
+                df, erro = carregar_planilha(id_s, gid_s)
+                if erro: st.error(erro)
+                else: 
+                    st.session_state.df_original_limp = df
+                    st.success("Carregado!"); st.rerun()
+        else:
+            up = st.file_uploader("Arquivo", type=['csv','xlsx'], key="limp_upload")
+            if up:
+                df, erro = carregar_arquivo_local(up)
+                if erro: st.error(erro)
+                else: 
+                    st.session_state.df_original_limp = df
+                    st.success("Carregado!"); st.rerun()
+
+    # Passo 2: Configurar limpeza
+    if 'df_original_limp' in st.session_state:
+        df = st.session_state.df_original_limp
+        st.header("Passo 2: Configurar Ações de Limpeza")
+
+        with st.form("form_limpeza"):
+            st.write("Marque as ações que deseja aplicar. Elas serão executadas na ordem abaixo.")
+            
+            # Ação 1: Remover Duplicatas
+            with st.expander("1. Remover Duplicatas"):
+                st.session_state.limp_duplicatas = st.checkbox("Ativar remoção de duplicatas")
+                st.session_state.limp_duplicatas_cols = st.multiselect(
+                    "Verificar duplicatas com base nas colunas:", df.columns, default=list(df.columns),
+                    help="Linhas com valores idênticos em todas estas colunas serão removidas."
+                )
+
+            # Ação 2: Tratar Vazios
+            with st.expander("2. Tratar Valores Vazios"):
+                st.session_state.limp_vazios = st.checkbox("Ativar tratamento de valores vazios")
+                st.session_state.limp_vazios_acao = st.radio("Ação:", ["Remover linhas com qualquer valor vazio", "Preencher valores vazios"], horizontal=True)
+                if st.session_state.limp_vazios_acao == "Preencher valores vazios":
+                    st.session_state.limp_vazios_valor = st.text_input("Preencher com o valor:", "0")
+
+            # Ação 3: Padronizar Texto
+            with st.expander("3. Padronizar Colunas de Texto"):
+                st.session_state.limp_texto = st.checkbox("Ativar padronização de texto")
+                colunas_texto = df.select_dtypes(include='object').columns.tolist()
+                st.session_state.limp_texto_cols = st.multiselect("Colunas para padronizar:", colunas_texto, default=colunas_texto)
+                st.session_state.limp_texto_acoes = st.multiselect("Ações de padronização:", ["Remover espaços extras (início/fim)", "Converter para MAIÚSCULAS", "Converter para minúsculas"])
+
+            submitted = st.form_submit_button("Aplicar Limpeza", type="primary")
+
+            if submitted:
+                with st.spinner("Processando limpeza..."):
+                    df_processado = df.copy()
+                    
+                    if st.session_state.get('limp_duplicatas'):
+                        subset = st.session_state.get('limp_duplicatas_cols')
+                        if subset:
+                            df_processado.drop_duplicates(subset=subset, inplace=True)
+
+                    if st.session_state.get('limp_vazios'):
+                        if st.session_state.get('limp_vazios_acao') == "Remover linhas com qualquer valor vazio":
+                            df_processado.dropna(inplace=True)
+                        else:
+                            valor_preencher = st.session_state.get('limp_vazios_valor', '')
+                            df_processado.fillna(valor_preencher, inplace=True)
+                    
+                    if st.session_state.get('limp_texto') and st.session_state.get('limp_texto_cols') and st.session_state.get('limp_texto_acoes'):
+                        for col in st.session_state.limp_texto_cols:
+                            if "Remover espaços extras (início/fim)" in st.session_state.limp_texto_acoes:
+                                df_processado[col] = df_processado[col].str.strip()
+                            if "Converter para MAIÚSCULAS" in st.session_state.limp_texto_acoes:
+                                df_processado[col] = df_processado[col].str.upper()
+                            if "Converter para minúsculas" in st.session_state.limp_texto_acoes:
+                                df_processado[col] = df_processado[col].str.lower()
+                    
+                    st.session_state.df_limpo_final = df_processado
+                    st.success("Limpeza concluída!")
+    
+    # Passo 3: Exibir resultado
+    if 'df_limpo_final' in st.session_state:
+        st.divider()
+        st.header("Resultado da Limpeza")
+        df_resultado = st.session_state.df_limpo_final
+        st.write(f"Linhas antes: {df.shape[0]} | Linhas depois: {df_resultado.shape[0]}")
+        st.dataframe(df_resultado)
+        st.markdown(gerar_download(df_resultado, "planilha_limpa"), unsafe_allow_html=True)
+
+def modulo_divisor():
+    st.title("Divisor de Planilhas")
+    st.write("Divida uma planilha grande em vários arquivos menores com base nos valores de uma coluna.")
+
+    if st.button("← Voltar ao Menu Principal"):
+        reset_divisor_state()
+        st.session_state.pagina_atual = "menu"
+        st.rerun()
+
+    st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
+    
+    # Passo 1: Carregar
+    with st.expander("Passo 1: Carregar Planilha", expanded=('df_original_div' not in st.session_state)):
+        # (código de carregamento igual aos outros, com chaves 'div_*')
+        origem = st.radio("Origem", ["Google Sheets", "Upload"], key="div_origem")
+        if origem == "Google Sheets":
+            id_d = st.text_input("ID Planilha", key="div_id", help=HELP_TEXT_SHEET_ID)
+            gid_d = st.text_input("GID Aba", key="div_gid", help=HELP_TEXT_GID)
+            if st.button("Carregar"):
+                df, erro = carregar_planilha(id_d, gid_d)
+                if erro: st.error(erro)
+                else: 
+                    st.session_state.df_original_div = df
+                    st.success("Carregado!"); st.rerun()
+        else:
+            up = st.file_uploader("Arquivo", type=['csv','xlsx'], key="div_upload")
+            if up:
+                df, erro = carregar_arquivo_local(up)
+                if erro: st.error(erro)
+                else: 
+                    st.session_state.df_original_div = df
+                    st.success("Carregado!"); st.rerun()
+
+    # Passo 2: Configurar Divisão
+    if 'df_original_div' in st.session_state:
+        df = st.session_state.df_original_div
+        st.header("Passo 2: Configurar Divisão")
+        
+        coluna_divisao = st.selectbox("Selecione a coluna para usar como critério de divisão:", df.columns)
+        formato_saida = st.radio("Formato dos arquivos de saída:", ["Excel (XLSX)", "CSV"], horizontal=True)
+        
+        if st.button("Dividir Planilha", type="primary"):
+            if not coluna_divisao:
+                st.warning("Selecione uma coluna para a divisão.")
+            else:
+                with st.spinner("Dividindo arquivos..."):
+                    valores_unicos = df[coluna_divisao].dropna().unique()
+                    dfs_para_zipar = {}
+                    
+                    for valor in valores_unicos:
+                        df_parte = df[df[coluna_divisao] == valor]
+                        # Limpa o nome do arquivo para evitar caracteres inválidos
+                        nome_arquivo = re.sub(r'[^\w\s-]', '', str(valor)).strip().replace(' ', '_')
+                        dfs_para_zipar[nome_arquivo] = df_parte
+                    
+                    formato = "XLSX" if "Excel" in formato_saida else "CSV"
+                    zip_data = gerar_download_zip(dfs_para_zipar, formato)
+                    st.session_state.dados_zip_div = zip_data
+                    st.session_state.nomes_arquivos_div = list(dfs_para_zipar.keys())
+                    st.success(f"{len(dfs_para_zipar)} arquivos gerados com sucesso!")
+
+    # Passo 3: Download do ZIP
+    if 'dados_zip_div' in st.session_state:
+        st.divider()
+        st.header("Passo 3: Baixar Arquivos")
+        st.info(f"Arquivos gerados: {', '.join(st.session_state.nomes_arquivos_div)}")
+        
+        st.download_button(
+            label="📥 Baixar todos os arquivos (.zip)",
+            data=st.session_state.dados_zip_div,
+            file_name="planilhas_divididas.zip",
+            mime="application/zip"
+        )
 
 # --- Página de Login ---
 def pagina_login():
