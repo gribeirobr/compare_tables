@@ -689,21 +689,12 @@ def modulo_agrupador():
         df = st.session_state.df_original_agrup
         st.header("Passo 2: Configurar Agrupamento")
 
-        # --- LÓGICA CORRIGIDA PARA ENCONTRAR COLUNAS CALCULÁVEIS ---
-        colunas_calculaveis = []
-        for col in df.columns:
-            # Tenta converter a coluna para número. Se não for composta apenas por valores nulos após a tentativa,
-            # significa que ela contém dados que podem ser calculados.
-            if not pd.to_numeric(df[col], errors='coerce').isnull().all():
-                colunas_calculaveis.append(col)
-        # --- FIM DA LÓGICA CORRIGIDA ---
-
-        if not colunas_calculaveis:
-            st.warning("Nenhuma coluna com dados numéricos foi encontrada na planilha para ser usada como métrica.")
-            return # Interrompe a execução se não houver o que calcular
-
-        cols_agrupar = st.multiselect("Agrupar por (dimensões):", options=df.columns)
-        col_calcular = st.selectbox("Coluna para calcular (métrica):", options=colunas_calculaveis) # Usa a nova lista
+        # --- ALTERAÇÃO PRINCIPAL: REMOVIDO O FILTRO DE COLUNAS ---
+        # O usuário agora pode selecionar QUALQUER coluna.
+        todas_as_colunas = df.columns.tolist()
+        
+        cols_agrupar = st.multiselect("Agrupar por (dimensões):", options=todas_as_colunas)
+        col_calcular = st.selectbox("Coluna para calcular (métrica):", options=todas_as_colunas) # <-- AQUI ESTÁ A MUDANÇA
 
         mapa_funcoes = {"Soma": "sum", "Média": "mean", "Contagem": "count", "Valor Máximo": "max", "Valor Mínimo": "min"}
         funcoes = st.multiselect("Cálculos a fazer:", options=list(mapa_funcoes.keys()), default=["Soma"])
@@ -714,8 +705,12 @@ def modulo_agrupador():
             else:
                 try:
                     with st.spinner("Calculando..."):
-                        # Garante que a coluna de cálculo seja numérica antes de agrupar
                         df_copia = df.copy()
+                        
+                        # A conversão para número continua aqui como uma salvaguarda.
+                        # Se a coluna não for numérica, ela se tornará uma coluna de 'NaN' (nulos).
+                        # As funções de agregação (soma, média) ignoram nulos, resultando em 0 ou NaN,
+                        # o que evita que o programa quebre.
                         df_copia[col_calcular] = pd.to_numeric(df_copia[col_calcular], errors='coerce')
                         
                         funcoes_pd = [mapa_funcoes[f] for f in funcoes]
@@ -725,12 +720,12 @@ def modulo_agrupador():
                         })
                         
                         # Aplaina os nomes das colunas se houver múltiplas agregações
-                        df_agrupado.columns = ['_'.join(col).strip() if isinstance(col, tuple) and col[1] else col[0] if isinstance(col, tuple) else col for col in df_agrupado.columns.values]
+                        df_agrupado.columns = ['_'.join(col).strip() if isinstance(col, tuple) and col[1]!='' else col[0] if isinstance(col, tuple) else col for col in df_agrupado.columns.values]
 
                         st.session_state.df_agrupado_final = df_agrupado
                         st.success("Agrupamento concluído!")
                 except Exception as e:
-                    st.error(f"Erro ao agrupar: {e}")
+                    st.error(f"Ocorreu um erro ao agrupar: {e}")
 
     # Passo 3: Exibir resultados
     if 'df_agrupado_final' in st.session_state:
