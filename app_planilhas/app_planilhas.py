@@ -996,24 +996,18 @@ def menu_principal():
         st.session_state.pagina_atual = "login"
         st.rerun()
 
-# --- Bloco Principal de Navegação ---
-
-# Lógica para obter o cookie. É executada em cada interação.
+# --- Bloco Principal de Navegação (ATUALIZADO) ---
 user_from_cookie = cookie_manager.get('user_session')
 
-# Se o estado não está autenticado, mas o cookie existe, restaura a sessão.
-if not st.session_state.get("autenticado"):
-    if user_from_cookie:
-        st.session_state.autenticado = True
-        st.session_state.usuario_logado = user_from_cookie
-        if "pagina_atual" not in st.session_state:
-            st.session_state.pagina_atual = "menu"
+if not st.session_state.get("autenticado") and user_from_cookie:
+    st.session_state.autenticado = True
+    st.session_state.usuario_logado = user_from_cookie
+    if "pagina_atual" not in st.session_state:
+        st.session_state.pagina_atual = "menu"
 
-# Define a página atual com base no estado de autenticação
 if not st.session_state.get("autenticado"):
     st.session_state.pagina_atual = "login"
 
-# Chama a função da página correta
 pagina = st.session_state.get("pagina_atual", "login")
 
 if pagina == "login":
@@ -1026,3 +1020,12 @@ elif pagina == "filtro":
     modulo_filtro()
 elif pagina == "renomeador":
     modulo_renomeador()
+# NOVO: Rotas para as novas páginas
+elif pagina == "unificador":
+    modulo_unificador()
+elif pagina == "agrupador":
+    modulo_agrupador()
+elif pagina == "limpador":
+    modulo_limpador()
+elif pagina == "divisor":
+    modulo_divisor()
