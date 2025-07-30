@@ -56,8 +56,10 @@ if st.session_state.autenticado:
             for col in df.columns:
                 if df[col].dtype == object:
                     try:
+                        # Tenta substituir vírgula por ponto e converter para float
                         df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='ignore')
-                    except AttributeError:
+                    except:
+                        # Se falhar, mantém como string
                         pass
             st.session_state.df_original = df
             return df
@@ -80,18 +82,8 @@ if st.session_state.autenticado:
             for filtro in filtros:
                 col = filtro["coluna"]
                 val = filtro["valor"]
-                if col and val:
-                    # Converter valor para o tipo da coluna se possível
-                    try:
-                        col_type = df[col].dtype
-                        if np.issubdtype(col_type, np.number):
-                            val = float(val)
-                        elif col_type == bool:
-                            val = bool(val)
-                    except:
-                        pass
-                    
-                    # Aplicar filtro
+                if col and val and col in df.columns:
+                    # Converter valor para string para comparação segura
                     df = df[df[col].astype(str) == str(val)]
             
             # Verificar se há dados após filtragem
@@ -101,7 +93,7 @@ if st.session_state.autenticado:
             
             # Calcular soma se possível
             soma = None
-            if coluna_soma:
+            if coluna_soma and coluna_soma in df.columns:
                 try:
                     # Tentar converter para numérico se necessário
                     if not pd.api.types.is_numeric_dtype(df[coluna_soma]):
@@ -163,14 +155,22 @@ if st.session_state.autenticado:
                             st.session_state.filtros[i]["coluna"] = coluna
                         
                         with col2:
-                            # Selecionar valor para filtro
-                            if coluna:
-                                valores = df[coluna].unique()
+                            # Selecionar valor para filtro - CORREÇÃO DO ERRO
+                            if coluna and coluna in df.columns:
+                                valores = df[coluna].astype(str).unique()
+                                
+                                # Encontrar índice do valor atual
+                                try:
+                                    index_valor = np.where(valores == str(filtro["valor"]))[0]
+                                    index_valor = index_valor[0] if len(index_valor) > 0 else 0
+                                except:
+                                    index_valor = 0
+                                
                                 valor = st.selectbox(
                                     f"Valor #{i+1}", 
                                     valores, 
                                     key=f"val_{i}",
-                                    index=np.where(valores == filtro["valor"])[0][0] if filtro["valor"] in valores else 0
+                                    index=index_valor
                                 )
                                 st.session_state.filtros[i]["valor"] = valor
                         
@@ -179,11 +179,19 @@ if st.session_state.autenticado:
                             st.write(" ")
                             st.button("❌", key=f"del_{i}", on_click=remover_filtro, args=(i,))
 
-                # Seleção da coluna para soma
+                # Seleção da coluna para soma (todas as colunas disponíveis)
                 st.subheader("Soma")
                 coluna_soma = st.selectbox("Coluna para somar:", [""] + list(df.columns))
-                if coluna_soma and not pd.api.types.is_numeric_dtype(df[coluna_soma]):
-                    st.warning(f"⚠️ A coluna '{coluna_soma}' não é numérica. A soma pode não funcionar corretamente.")
+                
+                if coluna_soma and coluna_soma != "":
+                    # Verificar se a coluna é numérica
+                    if not pd.api.types.is_numeric_dtype(df[coluna_soma]):
+                        # Tentar converter automaticamente
+                        try:
+                            df[coluna_soma] = pd.to_numeric(df[coluna_soma], errors='coerce')
+                            st.info(f"✅ Coluna '{coluna_soma}' convertida para numérica")
+                        except:
+                            st.warning(f"⚠️ A coluna '{coluna_soma}' não é numérica e não pode ser convertida")
                 
                 # Botão para processar
                 if st.button("Aplicar Filtros e Calcular Soma"):
@@ -205,9 +213,11 @@ if st.session_state.autenticado:
                         
                         # Download dos dados
                         st.subheader("Download dos Dados Filtrados")
-                        col3, col4 = st.columns(2)
                         
-                        with col3:
+                        # Criar abas para diferentes formatos
+                        tab1, tab2 = st.tabs(["📥 CSV", "📊 Excel"])
+                        
+                        with tab1:
                             csv = gerar_download(df_filtrado, 'CSV')
                             if csv:
                                 st.download_button(
@@ -217,7 +227,7 @@ if st.session_state.autenticado:
                                     mime='text/csv'
                                 )
                         
-                        with col4:
+                        with tab2:
                             excel = gerar_download(df_filtrado, 'XLSX')
                             if excel:
                                 st.download_button(
