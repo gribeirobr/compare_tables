@@ -159,6 +159,8 @@ def modulo_comparador():
         st.session_state.pagina_atual = "menu"
         st.rerun()
 
+    st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
+
     # Inicialização dos dataframes
     df_original = None
     df_atualizado = None
@@ -302,6 +304,8 @@ def modulo_filtro():
         reset_filtro_state() # Limpa o estado deste módulo
         st.session_state.pagina_atual = "menu"
         st.rerun()
+
+    st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
     
     # Inicialização de variáveis de sessão
     if 'filtros' not in st.session_state:
