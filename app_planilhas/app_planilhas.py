@@ -94,17 +94,17 @@ def carregar_arquivo_local(uploaded_file):
     try:
         if nome_arquivo.endswith('.csv'):
             uploaded_file.seek(0)
-            # Tenta ler com delimitador ; (comum no Brasil)
-            try:
-                df = pd.read_csv(uploaded_file, sep=';', encoding='utf-8-sig')
-            except Exception:
-                # Se falhar, tenta com ,
-                uploaded_file.seek(0)
-                df = pd.read_csv(uploaded_file, sep=',', encoding='utf-8-sig')
+            # **MUDANÇA PRINCIPAL:** Usar o 'sniffer' do pandas para detectar o separador
+            # O `sep=None` com `engine='python'` ativa a detecção automática.
+            df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-8-sig')
             
             # Checagem final para garantir que a leitura foi bem sucedida
-            if df.shape[1] == 1:
-                st.warning("O arquivo CSV foi lido com apenas uma coluna. Verifique se o delimitador é ',' ou ';'.")
+            if df.shape[1] <= 1:
+                st.warning(
+                    f"A leitura do arquivo '{nome_arquivo}' resultou em apenas uma coluna. "
+                    "O pandas não conseguiu identificar o separador automaticamente. "
+                    "Verifique se o arquivo está bem formatado, usando vírgulas (,) ou ponto e vírgula (;) como delimitador."
+                )
 
         elif nome_arquivo.endswith(('.xlsx', '.xls')):
             uploaded_file.seek(0)
@@ -113,6 +113,9 @@ def carregar_arquivo_local(uploaded_file):
             return None, "Formato de arquivo inválido. Por favor, envie um arquivo .csv ou .xlsx."
         
         # Limpeza e conversão de tipos
+        # Remove espaços em branco dos nomes das colunas, um erro comum
+        df.rename(columns={col: col.strip() for col in df.columns}, inplace=True)
+
         for col in df.columns:
             if df[col].dtype == object:
                 try:
