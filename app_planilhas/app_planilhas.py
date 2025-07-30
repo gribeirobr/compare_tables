@@ -11,6 +11,9 @@ import datetime
 
 cookie_manager = stc.CookieManager()
 
+HELP_TEXT_SHEET_ID = "Você encontra o ID na URL da sua planilha. É a longa sequência de caracteres entre `/spreadsheets/d/` e `/edit`."
+HELP_TEXT_GID = "O GID identifica a aba específica (página) da sua planilha. Você o encontra no final da URL, logo após `#gid=` (geralmente é um número como 0, 1, 2...)."
+
 # --- Configuração Inicial ---
 st.set_page_config(
     page_title="Ferramentas de Planilhas - GRB",
@@ -171,8 +174,8 @@ def modulo_comparador():
         st.header("Tabela A")
         origem_a = st.radio("Origem da Tabela A", ["Google Sheets", "Upload de Arquivo"], key="origem_a")
         if origem_a == "Google Sheets":
-            spreadsheet_id_a = st.text_input("ID da Planilha (Tabela A)", key="comp_id_a")
-            gid_original = st.text_input("GID da Aba (Tabela A)", key="comp_gid_a")
+            spreadsheet_id_a = st.text_input("ID da Planilha (Tabela A)", key="comp_id_a", help=HELP_TEXT_SHEET_ID)
+            gid_original = st.text_input("GID da Aba (Tabela A)", key="comp_gid_a", help=HELP_TEXT_GID)
             if st.button("Carregar Tabela A", key="load_a"):
                 with st.spinner("Carregando Tabela A..."):
                     df, erro = carregar_planilha(spreadsheet_id_a, gid_original)
@@ -194,8 +197,8 @@ def modulo_comparador():
         st.header("Tabela B")
         origem_b = st.radio("Origem da Tabela B", ["Google Sheets", "Upload de Arquivo"], key="origem_b")
         if origem_b == "Google Sheets":
-            spreadsheet_id_b = st.text_input("ID da Planilha (Tabela B)", key="comp_id_b")
-            gid_atualizado = st.text_input("GID da Aba (Tabela B)", key="comp_gid_b")
+            spreadsheet_id_b = st.text_input("ID da Planilha (Tabela B)", key="comp_id_b", help=HELP_TEXT_SHEET_ID)
+            gid_atualizado = st.text_input("GID da Aba (Tabela B)", key="comp_gid_b", help=HELP_TEXT_GID)
             if st.button("Carregar Tabela B", key="load_b"):
                  with st.spinner("Carregando Tabela B..."):
                     df, erro = carregar_planilha(spreadsheet_id_b, gid_atualizado)
@@ -317,8 +320,8 @@ def modulo_filtro():
         origem = st.radio("Origem da Planilha", ["Google Sheets", "Upload de Arquivo"], key="filtro_origem")
         
         if origem == "Google Sheets":
-            spreadsheet_id = st.text_input("ID da Planilha", key="filtro_id")
-            gid = st.text_input("GID da Aba", key="filtro_gid")
+            spreadsheet_id = st.text_input("ID da Planilha", key="filtro_id", help=HELP_TEXT_SHEET_ID)
+            gid = st.text_input("GID da Aba", key="filtro_gid", help=HELP_TEXT_GID)
             if st.button("Carregar do Google Sheets", type="primary"):
                 if spreadsheet_id and gid:
                     with st.spinner("Carregando..."):
@@ -436,8 +439,8 @@ def modulo_renomeador():
         origem = st.radio("Origem da Planilha", ["Google Sheets", "Upload de Arquivo"], key="ren_origem")
         
         if origem == "Google Sheets":
-            google_sheet_id = st.text_input("ID da Planilha", key="ren_id")
-            google_sheet_gid = st.text_input("GID da Aba", key="ren_gid")
+            google_sheet_id = st.text_input("ID da Planilha", key="ren_id", help=HELP_TEXT_SHEET_ID)
+            google_sheet_gid = st.text_input("GID da Aba", key="ren_gid", help=HELP_TEXT_GID)
             if st.button("Carregar do Google Sheets", type="primary"):
                 if google_sheet_id and google_sheet_gid:
                     with st.spinner("Carregando..."):
