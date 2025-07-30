@@ -672,33 +672,41 @@ def modulo_agrupador():
             if st.button("Carregar Dados"):
                 df, erro = carregar_planilha(id_sheet, gid_sheet)
                 if erro: st.error(erro)
-                else: 
+                else:
                     st.session_state.df_original_agrup = df
                     st.success("Planilha carregada!")
-                    
         else:
             upload = st.file_uploader("Selecione um arquivo", type=['csv','xlsx'], key="agrup_upload")
             if upload:
                 df, erro = carregar_arquivo_local(upload)
                 if erro: st.error(erro)
-                else: 
+                else:
                     st.session_state.df_original_agrup = df
                     st.success("Planilha carregada!")
-                    
 
     # Passo 2: Configurar agrupamento
     if 'df_original_agrup' in st.session_state:
         df = st.session_state.df_original_agrup
         st.header("Passo 2: Configurar Agrupamento")
-        
-        colunas_numericas = df.select_dtypes(include=np.number).columns.tolist()
-        colunas_texto = df.select_dtypes(include='object').columns.tolist()
+
+        # --- LÓGICA CORRIGIDA PARA ENCONTRAR COLUNAS CALCULÁVEIS ---
+        colunas_calculaveis = []
+        for col in df.columns:
+            # Tenta converter a coluna para número. Se não for composta apenas por valores nulos após a tentativa,
+            # significa que ela contém dados que podem ser calculados.
+            if not pd.to_numeric(df[col], errors='coerce').isnull().all():
+                colunas_calculaveis.append(col)
+        # --- FIM DA LÓGICA CORRIGIDA ---
+
+        if not colunas_calculaveis:
+            st.warning("Nenhuma coluna com dados numéricos foi encontrada na planilha para ser usada como métrica.")
+            return # Interrompe a execução se não houver o que calcular
 
         cols_agrupar = st.multiselect("Agrupar por (dimensões):", options=df.columns)
-        col_calcular = st.selectbox("Coluna para calcular (métrica):", options=colunas_numericas)
-        
+        col_calcular = st.selectbox("Coluna para calcular (métrica):", options=colunas_calculaveis) # Usa a nova lista
+
         mapa_funcoes = {"Soma": "sum", "Média": "mean", "Contagem": "count", "Valor Máximo": "max", "Valor Mínimo": "min"}
-        funcoes = st.multiselect("Cálculos a fazer:", options=list(mapa_funcoes.keys()), default="Soma")
+        funcoes = st.multiselect("Cálculos a fazer:", options=list(mapa_funcoes.keys()), default=["Soma"])
 
         if st.button("Agrupar e Calcular", type="primary"):
             if not cols_agrupar or not col_calcular or not funcoes:
@@ -706,8 +714,19 @@ def modulo_agrupador():
             else:
                 try:
                     with st.spinner("Calculando..."):
+                        # Garante que a coluna de cálculo seja numérica antes de agrupar
+                        df_copia = df.copy()
+                        df_copia[col_calcular] = pd.to_numeric(df_copia[col_calcular], errors='coerce')
+                        
                         funcoes_pd = [mapa_funcoes[f] for f in funcoes]
-                        df_agrupado = df.groupby(cols_agrupar)[col_calcular].agg(funcoes_pd).reset_index()
+                        
+                        df_agrupado = df_copia.groupby(cols_agrupar, as_index=False).agg({
+                            col_calcular: funcoes_pd
+                        })
+                        
+                        # Aplaina os nomes das colunas se houver múltiplas agregações
+                        df_agrupado.columns = ['_'.join(col).strip() if isinstance(col, tuple) and col[1] else col[0] if isinstance(col, tuple) else col for col in df_agrupado.columns.values]
+
                         st.session_state.df_agrupado_final = df_agrupado
                         st.success("Agrupamento concluído!")
                 except Exception as e:
