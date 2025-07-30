@@ -30,9 +30,16 @@ if not st.session_state.autenticado:
     st.stop()
 
 if st.session_state.autenticado:
+
     # Configuração da página
-    st.set_page_config(page_title="Filtro e Soma de Planilhas", page_icon="📊", layout="wide")
-    st.title("📊 Filtro e Soma de Planilha Google Sheets")
+    st.set_page_config(page_title="Filtro Avançado de Planilhas", page_icon="📊", layout="wide")
+    st.title("📊 Filtro Avançado de Planilha Google Sheets")
+
+    # Inicialização de variáveis de sessão
+    if 'filtros' not in st.session_state:
+        st.session_state.filtros = []
+    if 'df_original' not in st.session_state:
+        st.session_state.df_original = None
 
     # Entrada de dados do usuário
     with st.expander("🔑 Informações da Planilha", expanded=True):
@@ -45,24 +52,68 @@ if st.session_state.autenticado:
         try:
             url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/export?format=csv&gid={gid}"
             df = pd.read_csv(url, encoding='utf-8-sig')
+            # Converter colunas numéricas que podem estar como strings
+            for col in df.columns:
+                if df[col].dtype == object:
+                    try:
+                        df[col] = pd.to_numeric(df[col].str.replace(',', '.'), errors='ignore')
+                    except AttributeError:
+                        pass
             st.session_state.df_original = df
             return df
         except Exception as e:
             st.error(f"Erro ao carregar dados: {str(e)}")
             return None
 
+    # Adicionar novo filtro
+    def adicionar_filtro():
+        st.session_state.filtros.append({"coluna": "", "valor": ""})
+
+    # Remover filtro
+    def remover_filtro(index):
+        st.session_state.filtros.pop(index)
+
     # Processar dados e gerar resultados
-    def processar_dados(df, coluna_filtro, valor_filtro, coluna_soma):
+    def processar_dados(df, filtros, coluna_soma):
         try:
-            # Filtragem dos dados
-            df_filtrado = df[df[coluna_filtro].astype(str) == str(valor_filtro)]
+            # Aplicar todos os filtros
+            for filtro in filtros:
+                col = filtro["coluna"]
+                val = filtro["valor"]
+                if col and val:
+                    # Converter valor para o tipo da coluna se possível
+                    try:
+                        col_type = df[col].dtype
+                        if np.issubdtype(col_type, np.number):
+                            val = float(val)
+                        elif col_type == bool:
+                            val = bool(val)
+                    except:
+                        pass
+                    
+                    # Aplicar filtro
+                    df = df[df[col].astype(str) == str(val)]
             
-            # Cálculo da soma
-            soma = df_filtrado[coluna_soma].sum()
+            # Verificar se há dados após filtragem
+            if df.empty:
+                st.warning("⚠️ Nenhum dado encontrado após aplicação dos filtros!")
+                return df, None
             
-            return df_filtrado, soma
-        except KeyError:
-            st.error("Erro: Uma ou mais colunas selecionadas não existem no DataFrame")
+            # Calcular soma se possível
+            soma = None
+            if coluna_soma:
+                try:
+                    # Tentar converter para numérico se necessário
+                    if not pd.api.types.is_numeric_dtype(df[coluna_soma]):
+                        df[coluna_soma] = pd.to_numeric(df[coluna_soma], errors='coerce')
+                    
+                    soma = df[coluna_soma].sum()
+                except Exception as e:
+                    st.warning(f"⚠️ Não foi possível somar a coluna '{coluna_soma}': {str(e)}")
+            
+            return df, soma
+        except KeyError as ke:
+            st.error(f"Erro: Coluna não encontrada - {str(ke)}")
             return None, None
         except Exception as e:
             st.error(f"Erro no processamento: {str(e)}")
@@ -70,6 +121,9 @@ if st.session_state.autenticado:
 
     # Gerar arquivo para download
     def gerar_download(df, formato):
+        if df is None or df.empty:
+            return None
+            
         if formato == 'CSV':
             return df.to_csv(index=False).encode('utf-8-sig')
         elif formato == 'XLSX':
@@ -79,7 +133,7 @@ if st.session_state.autenticado:
             return output.getvalue()
 
     # Interface principal
-    if st.button("Carregar Planilha") or 'df_original' in st.session_state:
+    if st.button("Carregar Planilha") or st.session_state.df_original is not None:
         if not spreadsheet_id or not gid:
             st.warning("⚠️ Por favor, informe o ID da planilha e o GID da aba")
         else:
@@ -88,31 +142,63 @@ if st.session_state.autenticado:
             if df is not None:
                 st.success(f"✅ Dados carregados com sucesso! ({df.shape[0]} linhas, {df.shape[1]} colunas)")
                 
-                # Seleção das colunas
-                col1, col2 = st.columns(2)
+                # Botão para adicionar novos filtros
+                st.button("➕ Adicionar Filtro", on_click=adicionar_filtro)
                 
-                with col1:
-                    coluna_filtro = st.selectbox("Coluna para filtrar:", df.columns)
-                    # Obter valores únicos para o filtro
-                    valores_unicos = df[coluna_filtro].unique()
-                    valor_filtro = st.selectbox(f"Valor para filtrar em '{coluna_filtro}':", valores_unicos)
-                
-                with col2:
-                    colunas_numericas = df.select_dtypes(include=['number']).columns
-                    if len(colunas_numericas) == 0:
-                        st.warning("⚠️ Nenhuma coluna numérica encontrada para soma!")
-                        coluna_soma = None
-                    else:
-                        coluna_soma = st.selectbox("Coluna para somar:", colunas_numericas)
-                
-                if st.button("Aplicar Filtro e Calcular Soma") and coluna_soma is not None:
-                    df_filtrado, soma = processar_dados(df, coluna_filtro, valor_filtro, coluna_soma)
+                # Interface de filtros
+                with st.container():
+                    st.subheader("Filtros")
                     
-                    if df_filtrado is not None:
+                    # Exibir filtros existentes
+                    for i, filtro in enumerate(st.session_state.filtros):
+                        col1, col2, col3 = st.columns([3, 3, 1])
+                        with col1:
+                            # Selecionar coluna para filtro
+                            coluna = st.selectbox(
+                                f"Coluna #{i+1}", 
+                                df.columns, 
+                                key=f"col_{i}",
+                                index=df.columns.get_loc(filtro["coluna"]) if filtro["coluna"] in df.columns else 0
+                            )
+                            st.session_state.filtros[i]["coluna"] = coluna
+                        
+                        with col2:
+                            # Selecionar valor para filtro
+                            if coluna:
+                                valores = df[coluna].unique()
+                                valor = st.selectbox(
+                                    f"Valor #{i+1}", 
+                                    valores, 
+                                    key=f"val_{i}",
+                                    index=np.where(valores == filtro["valor"])[0][0] if filtro["valor"] in valores else 0
+                                )
+                                st.session_state.filtros[i]["valor"] = valor
+                        
+                        with col3:
+                            # Botão para remover filtro
+                            st.write(" ")
+                            st.button("❌", key=f"del_{i}", on_click=remover_filtro, args=(i,))
+
+                # Seleção da coluna para soma
+                st.subheader("Soma")
+                coluna_soma = st.selectbox("Coluna para somar:", [""] + list(df.columns))
+                if coluna_soma and not pd.api.types.is_numeric_dtype(df[coluna_soma]):
+                    st.warning(f"⚠️ A coluna '{coluna_soma}' não é numérica. A soma pode não funcionar corretamente.")
+                
+                # Botão para processar
+                if st.button("Aplicar Filtros e Calcular Soma"):
+                    df_filtrado, soma = processar_dados(
+                        st.session_state.df_original.copy(),
+                        st.session_state.filtros,
+                        coluna_soma if coluna_soma != "" else None
+                    )
+                    
+                    if df_filtrado is not None and not df_filtrado.empty:
                         st.subheader("Resultados")
                         
-                        # Mostrar resultado da soma
-                        st.metric(f"Soma de '{coluna_soma}'", f"{soma:,.2f}")
+                        # Mostrar resultado da soma se aplicável
+                        if soma is not None:
+                            st.metric(f"Soma de '{coluna_soma}'", f"{soma:,.2f}")
                         
                         # Mostrar tabela filtrada
                         st.dataframe(df_filtrado)
@@ -123,38 +209,20 @@ if st.session_state.autenticado:
                         
                         with col3:
                             csv = gerar_download(df_filtrado, 'CSV')
-                            st.download_button(
-                                label="Baixar como CSV",
-                                data=csv,
-                                file_name='dados_filtrados.csv',
-                                mime='text/csv'
-                            )
+                            if csv:
+                                st.download_button(
+                                    label="Baixar como CSV",
+                                    data=csv,
+                                    file_name='dados_filtrados.csv',
+                                    mime='text/csv'
+                                )
                         
                         with col4:
                             excel = gerar_download(df_filtrado, 'XLSX')
-                            st.download_button(
-                                label="Baixar como Excel",
-                                data=excel,
-                                file_name='dados_filtrados.xlsx',
-                                mime='application/vnd.ms-excel'
-                            )
-
-    # Instruções de uso
-    st.markdown("""
-    ---
-
-    ### 📌 Instruções de Uso:
-    1. Obtenha o **ID da Planilha** e **GID da Aba** da URL do Google Sheets:
-    - Formato da URL: `https://docs.google.com/spreadsheets/d/[ID_DA_PLANILHA]/edit#gid=[GID_DA_ABA]`
-    2. Cole os valores nos campos acima
-    3. Clique em **"Carregar Planilha"**
-    4. Selecione a coluna para filtrar e o valor desejado
-    5. Escolha a coluna numérica para soma
-    6. Clique em **"Aplicar Filtro e Calcular Soma"**
-    7. Faça o download dos resultados nos formatos disponíveis
-
-    > ⚠️ A planilha precisa estar configurada com acesso público (qualquer pessoa com o link pode visualizar)
-    """)
-
-    # Rodapé
-    st.caption("Desenvolvido com Streamlit | [Documentação do Streamlit](https://docs.streamlit.io/)")
+                            if excel:
+                                st.download_button(
+                                    label="Baixar como Excel",
+                                    data=excel,
+                                    file_name='dados_filtrados.xlsx',
+                                    mime='application/vnd.ms-excel'
+                                )
