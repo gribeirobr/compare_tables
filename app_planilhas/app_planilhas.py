@@ -124,10 +124,14 @@ def carregar_arquivo_local(uploaded_file):
 
 # --- Módulo 1: Comparador de Tabelas ---
 def modulo_comparador():
-    st.title("Comparador de Tabelas do Google Sheets")
-    st.write("Compare duas abas de uma planilha Google Sheets e identifique diferenças")
+    st.title("Comparador de Tabelas")
+    st.write("Compare duas tabelas (do Google Sheets ou de arquivos locais) e identifique as diferenças.")
     
     if st.button("← Voltar ao Menu Principal"):
+        # Limpar o estado do módulo ao sair para evitar dataframes "fantasmas"
+        for key in ['df_original_comp', 'df_atualizado_comp']:
+            if key in st.session_state:
+                del st.session_state[key]
         st.session_state.pagina_atual = "menu"
         st.rerun()
 
@@ -145,7 +149,7 @@ def modulo_comparador():
             gid_original = st.text_input("GID da Aba (Tabela A)", key="comp_gid_a")
             if st.button("Carregar Tabela A", key="load_a"):
                 with st.spinner("Carregando Tabela A..."):
-                    df, erro = carregar_planilha(spreadsheet_id_a, gid_original)
+                    df, erro = carregar_planilha_gsheet(spreadsheet_id_a, gid_original)
                     if erro: st.error(f"Erro ao carregar Tabela A: {erro}")
                     else: 
                         st.session_state.df_original_comp = df
@@ -168,7 +172,7 @@ def modulo_comparador():
             gid_atualizado = st.text_input("GID da Aba (Tabela B)", key="comp_gid_b")
             if st.button("Carregar Tabela B", key="load_b"):
                  with st.spinner("Carregando Tabela B..."):
-                    df, erro = carregar_planilha(spreadsheet_id_b, gid_atualizado)
+                    df, erro = carregar_planilha_gsheet(spreadsheet_id_b, gid_atualizado)
                     if erro: st.error(f"Erro ao carregar Tabela B: {erro}")
                     else: 
                         st.session_state.df_atualizado_comp = df
@@ -192,14 +196,15 @@ def modulo_comparador():
     if df_original is not None and df_atualizado is not None:
         st.divider()
         st.header("Mapeamento de Colunas para Comparação")
+        st.info("Selecione as colunas que servem como identificador único dos registros (chaves). Ex: ID do cliente, CPF, etc.")
         
         col_map1, col_map2 = st.columns(2)
         with col_map1:
-            st.markdown("**Colunas da Tabela A**")
-            colunas_original = st.multiselect("Selecione as colunas-chave da Tabela A", df_original.columns, key="ms_orig")
+            st.markdown("**Colunas-Chave da Tabela A**")
+            colunas_original = st.multiselect("Selecione as colunas da Tabela A", df_original.columns, key="ms_orig")
         with col_map2:
-            st.markdown("**Colunas da Tabela B**")
-            colunas_atualizado = st.multiselect("Selecione as colunas-chave da Tabela B", df_atualizado.columns, key="ms_atual")
+            st.markdown("**Colunas-Chave da Tabela B**")
+            colunas_atualizado = st.multiselect("Selecione as colunas da Tabela B (na mesma ordem da Tabela A)", df_atualizado.columns, key="ms_atual")
 
         if st.button("Comparar Tabelas", type="primary"):
             if not colunas_original or not colunas_atualizado:
@@ -208,17 +213,24 @@ def modulo_comparador():
                 st.warning("O número de colunas-chave deve ser o mesmo em ambas as tabelas!")
             else:
                 try:
-                    with st.spinner("Comparando..."):
-                        column_mapping = dict(zip(colunas_original, colunas_atualizado))
+                    with st.spinner("Preparando dados e comparando..."):
+                        # Criar uma cópia do df2 para não alterar o original no session_state
+                        df_atualizado_temp = df_atualizado.copy()
 
+                        # Criar o dicionário para renomear as colunas de B para que coincidam com A
+                        mapa_renomeacao = {col_b: col_a for col_a, col_b in zip(colunas_original, colunas_atualizado)}
+                        
+                        # Renomear as colunas na cópia do df2
+                        df_atualizado_temp.rename(columns=mapa_renomeacao, inplace=True)
+
+                        # Agora, a comparação usa `colunas_original` como a chave para AMBOS os DataFrames
                         comparacao = datacompy.Compare(
                             df1=df_original,
-                            df2=df_atualizado,
-                            join_columns=list(column_mapping.keys()), # Chaves da Tabela A
+                            df2=df_atualizado_temp, # Usar o DF com colunas renomeadas
+                            join_columns=colunas_original, # A lista de chaves agora é a mesma para ambos
                             df1_name='Original',
                             df2_name='Atualizado',
-                            rename_columns={v: k for k, v in column_mapping.items()}, # Renomeia B para A
-                            abs_tol=0,
+                            abs_tol=0.0001, # Tolerância para números de ponto flutuante
                             rel_tol=0
                         )
                         comparacao.matches(ignore_extra_columns=True)
@@ -226,11 +238,12 @@ def modulo_comparador():
                         df1_unq = comparacao.df1_unq_rows
                         df2_unq = comparacao.df2_unq_rows
                         df_intersecao = comparacao.intersect_rows
-
+                        
+                        # Limpa textos em todos os dataframes de resultado
                         for df in [df1_unq, df2_unq, df_intersecao]:
                             for col in df.select_dtypes(include='object').columns:
                                 df[col] = df[col].apply(limpar_texto)
-
+                        
                         st.header("Resultados da Comparação")
                         col_res1, col_res2, col_res3 = st.columns(3)
                         
@@ -250,7 +263,8 @@ def modulo_comparador():
                             st.markdown(gerar_download(df_intersecao, "registros_em_ambas_tabelas", 'ambos'), unsafe_allow_html=True)
 
                         st.divider()
-                        st.write(comparacao.report())
+                        with st.expander("Ver Relatório Detalhado da Comparação"):
+                            st.text(comparacao.report())
 
                 except Exception as e:
                     st.error(f"Erro na comparação: {str(e)}")
