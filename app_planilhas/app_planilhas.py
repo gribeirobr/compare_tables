@@ -15,13 +15,11 @@ cookie_manager = stc.CookieManager()
 HELP_TEXT_SHEET_ID = "Você encontra o ID na URL da sua planilha. É a longa sequência de caracteres entre `/spreadsheets/d/` e `/edit`."
 HELP_TEXT_GID = "O GID identifica a aba específica (página) da sua planilha. Você o encontra no final da URL, logo após `#gid=` (geralmente é um número como 0, 1, 2...)."
 
-# --- Configuração Inicial ---
 st.set_page_config(
     page_title="Ferramentas de Planilhas - GRB",
     layout="wide"
 )
 
-# --- Sistema de Autenticação Unificado ---
 USUARIOS_CADASTRADOS = {
     "guilherme": "senha_guilherme",
     "GABI_REZENDE": "gabiR#123",
@@ -37,7 +35,6 @@ if "usuario_logado" not in st.session_state:
 if "pagina_atual" not in st.session_state:
     st.session_state.pagina_atual = "login"
 
-# --- Funções Utilitárias Comuns ---
 def limpar_texto(texto):
     if isinstance(texto, str):
         texto = texto.replace('\u00A0', ' ')
@@ -53,7 +50,6 @@ def gerar_download(df, filename, formato='excel'):
     if df is None or df.empty:
         return ""
     
-    # Download para Excel
     if formato == 'excel' or formato == 'ambos':
         output_excel = io.BytesIO()
         with pd.ExcelWriter(output_excel) as writer:
@@ -61,13 +57,11 @@ def gerar_download(df, filename, formato='excel'):
         b64_excel = b64encode(output_excel.getvalue()).decode()
         link_excel = f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64_excel}" download="{filename}.xlsx">📊 Excel</a>'
     
-    # Download para CSV
     if formato == 'csv' or formato == 'ambos':
         csv = df.to_csv(index=False).encode('utf-8-sig')
         b64_csv = b64encode(csv).decode()
         link_csv = f'<a href="data:file/csv;base64,{b64_csv}" download="{filename}.csv">📥 CSV</a>'
     
-    # Retorna os dois links formatados
     if formato == 'ambos':
         return f'<div style="display:flex;gap:10px;margin-top:10px;">{link_csv} {link_excel}</div>'
     elif formato == 'excel':
@@ -102,11 +96,8 @@ def carregar_arquivo_local(uploaded_file):
     try:
         if nome_arquivo.endswith('.csv'):
             uploaded_file.seek(0)
-            # **MUDANÇA PRINCIPAL:** Usar o 'sniffer' do pandas para detectar o separador
-            # O `sep=None` com `engine='python'` ativa a detecção automática.
             df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-8-sig')
             
-            # Checagem final para garantir que a leitura foi bem sucedida
             if df.shape[1] <= 1:
                 st.warning(
                     f"A leitura do arquivo '{nome_arquivo}' resultou em apenas uma coluna. "
@@ -120,17 +111,14 @@ def carregar_arquivo_local(uploaded_file):
         else:
             return None, "Formato de arquivo inválido. Por favor, envie um arquivo .csv ou .xlsx."
         
-        # Limpeza e conversão de tipos
-        # Remove espaços em branco dos nomes das colunas, um erro comum
         df.rename(columns={col: col.strip() for col in df.columns}, inplace=True)
 
         for col in df.columns:
             if df[col].dtype == object:
                 try:
-                    # Tenta converter para numérico, tratando vírgula como decimal
                     df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='ignore')
                 except:
-                    pass # Ignora erros se a conversão não for possível
+                    pass 
         return df, None
     except Exception as e:
         return None, f"Erro ao processar o arquivo: {e}"
@@ -143,11 +131,9 @@ def gerar_download_zip(dfs_dict, formato_arquivo):
     with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED, False) as zip_file:
         for filename, df in dfs_dict.items():
             if formato_arquivo == 'CSV':
-                # Salva como CSV
                 csv_data = df.to_csv(index=False).encode('utf-8-sig')
                 zip_file.writestr(f'{filename}.{ext}', csv_data)
             else:
-                # Salva como XLSX
                 excel_buffer = io.BytesIO()
                 with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
                     df.to_excel(writer, index=False, sheet_name='Dados')
@@ -191,19 +177,17 @@ def reset_divisor_state():
     for key in ['df_original_div', 'dados_zip_div']:
         if key in st.session_state: del st.session_state[key]
 
-# --- Módulo 1: Comparador de Tabelas ---
 def modulo_comparador():
     st.title("Comparador de Tabelas")
     st.write("Compare duas tabelas (do Google Sheets ou de arquivos locais) e identifique as diferenças.")
     
     if st.button("← Voltar ao Menu Principal"):
-        reset_comparador_state() # Limpa o estado deste módulo
+        reset_comparador_state() 
         st.session_state.pagina_atual = "menu"
         st.rerun()
 
     st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
 
-    # Inicialização dos dataframes
     df_original = None
     df_atualizado = None
 
@@ -255,7 +239,6 @@ def modulo_comparador():
                         st.session_state.df_atualizado_comp = df
                         st.success(f"Arquivo da Tabela B carregado ({df.shape[0]} linhas).")
 
-    # Recupera os dataframes do estado da sessão
     if 'df_original_comp' in st.session_state:
         df_original = st.session_state.df_original_comp
     if 'df_atualizado_comp' in st.session_state:
@@ -282,23 +265,19 @@ def modulo_comparador():
             else:
                 try:
                     with st.spinner("Preparando dados e comparando..."):
-                        # Criar uma cópia do df2 para não alterar o original no session_state
                         df_atualizado_temp = df_atualizado.copy()
 
-                        # Criar o dicionário para renomear as colunas de B para que coincidam com A
                         mapa_renomeacao = {col_b: col_a for col_a, col_b in zip(colunas_original, colunas_atualizado)}
                         
-                        # Renomear as colunas na cópia do df2
                         df_atualizado_temp.rename(columns=mapa_renomeacao, inplace=True)
 
-                        # Agora, a comparação usa `colunas_original` como a chave para AMBOS os DataFrames
                         comparacao = datacompy.Compare(
                             df1=df_original,
-                            df2=df_atualizado_temp, # Usar o DF com colunas renomeadas
-                            join_columns=colunas_original, # A lista de chaves agora é a mesma para ambos
+                            df2=df_atualizado_temp, 
+                            join_columns=colunas_original, 
                             df1_name='Original',
                             df2_name='Atualizado',
-                            abs_tol=0.0001, # Tolerância para números de ponto flutuante
+                            abs_tol=0.0001, 
                             rel_tol=0
                         )
                         comparacao.matches(ignore_extra_columns=True)
@@ -307,7 +286,6 @@ def modulo_comparador():
                         df2_unq = comparacao.df2_unq_rows
                         df_intersecao = comparacao.intersect_rows
                         
-                        # Limpa textos em todos os dataframes de resultado
                         for df in [df1_unq, df2_unq, df_intersecao]:
                             for col in df.select_dtypes(include='object').columns:
                                 df[col] = df[col].apply(limpar_texto)
@@ -337,19 +315,17 @@ def modulo_comparador():
                 except Exception as e:
                     st.error(f"Erro na comparação: {str(e)}")
 
-# --- Módulo 2: Filtro Avançado ---
 def modulo_filtro():
     st.title("Filtro Avançado de Planilhas")
     st.write("Filtre dados de uma planilha (do Google Sheets ou de arquivos locais) com múltiplos critérios e gere somas")
     
     if st.button("← Voltar ao Menu Principal"):
-        reset_filtro_state() # Limpa o estado deste módulo
+        reset_filtro_state() 
         st.session_state.pagina_atual = "menu"
         st.rerun()
 
     st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
     
-    # Inicialização de variáveis de sessão
     if 'filtros' not in st.session_state:
         st.session_state.filtros = []
     if 'df_original_filtro' not in st.session_state:
@@ -395,7 +371,6 @@ def modulo_filtro():
         if not st.session_state.filtros:
             st.info("Nenhum filtro aplicado. Clique em 'Adicionar Novo Filtro' para começar.")
         
-        # Interface de filtros
         for i, filtro in enumerate(st.session_state.filtros):
             col_f1, col_f2, col_f3 = st.columns([4, 4, 1])
             with col_f1:
@@ -451,18 +426,15 @@ def modulo_filtro():
                 st.subheader("Exportar Resultados")
                 st.markdown(gerar_download(df_filtrado, "dados_filtrados", 'ambos'), unsafe_allow_html=True)
 
-
-# --- Módulo 3: Renomeador de Colunas ---
 def modulo_renomeador():
     st.title("Renomeador de Colunas")
     st.write("Selecione e renomeie colunas de uma planilha (do Google Sheets ou de arquivos locais)")
     
     if st.button("← Voltar ao Menu Principal"):
-        reset_renomeador_state() # Limpa o estado deste módulo
+        reset_renomeador_state() 
         st.session_state.pagina_atual = "menu"
         st.rerun()
     
-    # Resetar estados se a página for recarregada
     if 'df_original_ren' not in st.session_state:
         st.session_state.df_original_ren = None
     if 'df_final_ren' not in st.session_state:
@@ -556,7 +528,6 @@ def modulo_unificador():
 
     st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
 
-    # Passo 1: Carregar as duas tabelas
     col1, col2 = st.columns(2)
     with col1:
         st.header("Tabela A (Esquerda)")
@@ -600,7 +571,6 @@ def modulo_unificador():
                     st.session_state.df_b_unif = df
                     st.success(f"Tabela B carregada ({df.shape[0]} linhas).")
 
-    # Passo 2: Configurar a unificação
     if 'df_a_unif' in st.session_state and 'df_b_unif' in st.session_state:
         df_a = st.session_state.df_a_unif
         df_b = st.session_state.df_b_unif
@@ -623,10 +593,9 @@ def modulo_unificador():
             else:
                 try:
                     with st.spinner("Unificando..."):
-                        # Mapeia a opção do rádio para o parâmetro do pandas
+                        
                         how_param = 'left' if 'Left Join' in tipo_uniao else 'inner'
                         
-                        # Garante que a coluna chave da Tabela B esteja na lista de colunas a serem puxadas
                         if key_b not in cols_b:
                             cols_b.insert(0, key_b)
 
@@ -636,14 +605,13 @@ def modulo_unificador():
                             left_on=key_a,
                             right_on=key_b,
                             how=how_param,
-                            suffixes=('_A', '_B') # Adiciona sufixo se houver colunas com mesmo nome
+                            suffixes=('_A', '_B') 
                         )
                         st.session_state.df_unificado_final = df_final
                         st.success("Tabelas unificadas com sucesso!")
                 except Exception as e:
                     st.error(f"Ocorreu um erro na unificação: {e}")
 
-    # Passo 3: Mostrar resultado
     if 'df_unificado_final' in st.session_state:
         st.divider()
         st.header("Resultado da Unificação")
@@ -663,7 +631,6 @@ def modulo_agrupador():
 
     st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
 
-    # Passo 1: Carregar dados
     with st.expander("Passo 1: Carregar Dados", expanded=('df_original_agrup' not in st.session_state)):
         origem = st.radio("Origem da Planilha", ["Google Sheets", "Upload de Arquivo"], key="agrup_origem")
         if origem == "Google Sheets":
@@ -684,24 +651,19 @@ def modulo_agrupador():
                     st.session_state.df_original_agrup = df
                     st.success("Planilha carregada!")
 
-    # Passo 2: Configurar agrupamento
+    
     if 'df_original_agrup' in st.session_state:
         df = st.session_state.df_original_agrup
         st.header("Passo 2: Configurar Agrupamento")
 
-        # --- CORREÇÃO DEFINITIVA ---
-        # 1. Pegamos a lista de colunas diretamente do DataFrame. É a fonte mais segura.
         lista_de_colunas = df.columns.tolist()
 
-        # 2. (OPCIONAL) Adicionamos uma linha para depuração, para ver exatamente o que o app está lendo.
         with st.expander("Ver colunas detectadas pelo sistema"):
             st.write(lista_de_colunas)
             st.info(f"Total de colunas detectadas: {len(lista_de_colunas)}")
 
-        # 3. Usamos essa lista limpa e correta para popular os menus de seleção.
         cols_agrupar = st.multiselect("Agrupar por (dimensões):", options=lista_de_colunas)
         col_calcular = st.selectbox("Coluna para calcular (métrica):", options=lista_de_colunas)
-        # --- FIM DA CORREÇÃO ---
 
         mapa_funcoes = {"Soma": "sum", "Média": "mean", "Contagem": "count", "Valor Máximo": "max", "Valor Mínimo": "min"}
         funcoes = st.multiselect("Cálculos a fazer:", options=list(mapa_funcoes.keys()), default=["Soma"])
@@ -714,8 +676,6 @@ def modulo_agrupador():
                     with st.spinner("Calculando..."):
                         df_copia = df.copy()
                         
-                        # Salvaguarda: tenta converter a coluna escolhida para número.
-                        # Se não for possível, vira 'NaN' e os cálculos resultam em 0 ou NaN, sem quebrar.
                         df_copia[col_calcular] = pd.to_numeric(df_copia[col_calcular], errors='coerce')
                         
                         funcoes_pd = [mapa_funcoes[f] for f in funcoes]
@@ -724,7 +684,6 @@ def modulo_agrupador():
                             col_calcular: funcoes_pd
                         })
                         
-                        # Aplaina os nomes das colunas se houver múltiplas agregações
                         df_agrupado.columns = ['_'.join(col).strip() if isinstance(col, tuple) and col[1]!='' else col[0] if isinstance(col, tuple) else col for col in df_agrupado.columns.values]
 
                         st.session_state.df_agrupado_final = df_agrupado
@@ -732,7 +691,6 @@ def modulo_agrupador():
                 except Exception as e:
                     st.error(f"Ocorreu um erro ao agrupar: {e}")
 
-    # Passo 3: Exibir resultados
     if 'df_agrupado_final' in st.session_state:
         st.divider()
         st.header("Resultado do Agrupamento")
@@ -751,9 +709,8 @@ def modulo_limpador():
 
     st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
 
-    # Passo 1: Carregar dados
+    
     with st.expander("Passo 1: Carregar Planilha", expanded=('df_original_limp' not in st.session_state)):
-        # (código de carregamento igual ao módulo agrupador, com chaves 'limp_*')
         origem = st.radio("Origem", ["Google Sheets", "Upload"], key="limp_origem")
         if origem == "Google Sheets":
             id_s = st.text_input("ID Planilha", key="limp_id", help=HELP_TEXT_SHEET_ID)
@@ -773,7 +730,6 @@ def modulo_limpador():
                     st.session_state.df_original_limp = df
                     st.success("Carregado!"); 
 
-    # Passo 2: Configurar limpeza
     if 'df_original_limp' in st.session_state:
         df = st.session_state.df_original_limp
         st.header("Passo 2: Configurar Ações de Limpeza")
@@ -781,7 +737,6 @@ def modulo_limpador():
         with st.form("form_limpeza"):
             st.write("Marque as ações que deseja aplicar. Elas serão executadas na ordem abaixo.")
             
-            # Ação 1: Remover Duplicatas
             with st.expander("1. Remover Duplicatas"):
                 st.session_state.limp_duplicatas = st.checkbox("Ativar remoção de duplicatas")
                 st.session_state.limp_duplicatas_cols = st.multiselect(
@@ -789,14 +744,12 @@ def modulo_limpador():
                     help="Linhas com valores idênticos em todas estas colunas serão removidas."
                 )
 
-            # Ação 2: Tratar Vazios
             with st.expander("2. Tratar Valores Vazios"):
                 st.session_state.limp_vazios = st.checkbox("Ativar tratamento de valores vazios")
                 st.session_state.limp_vazios_acao = st.radio("Ação:", ["Remover linhas com qualquer valor vazio", "Preencher valores vazios"], horizontal=True)
                 if st.session_state.limp_vazios_acao == "Preencher valores vazios":
                     st.session_state.limp_vazios_valor = st.text_input("Preencher com o valor:", "0")
 
-            # Ação 3: Padronizar Texto
             with st.expander("3. Padronizar Colunas de Texto"):
                 st.session_state.limp_texto = st.checkbox("Ativar padronização de texto")
                 colunas_texto = df.select_dtypes(include='object').columns.tolist()
@@ -832,8 +785,7 @@ def modulo_limpador():
                     
                     st.session_state.df_limpo_final = df_processado
                     st.success("Limpeza concluída!")
-    
-    # Passo 3: Exibir resultado
+
     if 'df_limpo_final' in st.session_state:
         st.divider()
         st.header("Resultado da Limpeza")
@@ -852,10 +804,8 @@ def modulo_divisor():
         st.rerun()
 
     st.warning("Sua planilha do Google Sheets deve estar em modo público. Acesse \"Compartilhar\" e ative a opção \"Qualquer pessoa com o link pode visualizar\".")
-    
-    # Passo 1: Carregar
+
     with st.expander("Passo 1: Carregar Planilha", expanded=('df_original_div' not in st.session_state)):
-        # (código de carregamento igual aos outros, com chaves 'div_*')
         origem = st.radio("Origem", ["Google Sheets", "Upload"], key="div_origem")
         if origem == "Google Sheets":
             id_d = st.text_input("ID Planilha", key="div_id", help=HELP_TEXT_SHEET_ID)
@@ -875,7 +825,6 @@ def modulo_divisor():
                     st.session_state.df_original_div = df
                     st.success("Carregado!"); 
 
-    # Passo 2: Configurar Divisão
     if 'df_original_div' in st.session_state:
         df = st.session_state.df_original_div
         st.header("Passo 2: Configurar Divisão")
@@ -893,7 +842,6 @@ def modulo_divisor():
                     
                     for valor in valores_unicos:
                         df_parte = df[df[coluna_divisao] == valor]
-                        # Limpa o nome do arquivo para evitar caracteres inválidos
                         nome_arquivo = re.sub(r'[^\w\s-]', '', str(valor)).strip().replace(' ', '_')
                         dfs_para_zipar[nome_arquivo] = df_parte
                     
@@ -903,7 +851,6 @@ def modulo_divisor():
                     st.session_state.nomes_arquivos_div = list(dfs_para_zipar.keys())
                     st.success(f"{len(dfs_para_zipar)} arquivos gerados com sucesso!")
 
-    # Passo 3: Download do ZIP
     if 'dados_zip_div' in st.session_state:
         st.divider()
         st.header("Passo 3: Baixar Arquivos")
@@ -916,7 +863,6 @@ def modulo_divisor():
             mime="application/zip"
         )
 
-# --- Página de Login ---
 def pagina_login():
     st.title("Ferramentas de Planilhas - GRB")
     st.subheader("Autenticação")
@@ -1012,7 +958,6 @@ def menu_principal():
         st.session_state.pagina_atual = "login"
         st.rerun()
 
-# --- Bloco Principal de Navegação 
 user_from_cookie = cookie_manager.get('user_session')
 
 if not st.session_state.get("autenticado") and user_from_cookie:
